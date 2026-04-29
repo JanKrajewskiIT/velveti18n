@@ -1,27 +1,13 @@
+import { warnDevOnce } from '../dev';
 import type { Locale } from '../types';
 
 const numberFormatters = new Map<string, Intl.NumberFormat>();
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
 const pluralRules = new Map<string, Intl.PluralRules>();
 const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
-const warnedMessages = new Set<string>();
 
-const cacheKey = (locale: string, opts?: object): string => (opts ? `${locale}|${JSON.stringify(opts)}` : locale);
-
-const isDev = (): boolean => {
-  const env = (import.meta as { env?: { DEV?: boolean; MODE?: string } }).env;
-  if (!env) return false;
-  if (env.DEV !== undefined) return env.DEV;
-  if (env.MODE !== undefined) return env.MODE !== 'production';
-  return false;
-};
-
-const warnOnce = (message: string): void => {
-  if (!isDev()) return;
-  if (warnedMessages.has(message)) return;
-  warnedMessages.add(message);
-  console.warn(message);
-};
+const cacheKey = (locale: string, options?: object): string =>
+  options ? `${locale}|${JSON.stringify(options)}` : locale;
 
 export function getNumberFormat(locale: Locale, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
   const key = cacheKey(locale, options);
@@ -66,13 +52,23 @@ export function getRelativeTimeFormat(
   return formatter;
 }
 
+export function coerceDate(value: unknown): Date {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === 'number' || typeof value === 'string') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  warnDevOnce('[velvet-i18n] Invalid date value received. Falling back to Unix epoch.');
+  return new Date(0);
+}
+
 export function resolveNumberStyle(style?: string): Intl.NumberFormatOptions | undefined {
   if (!style) return undefined;
   switch (style) {
     case 'percent':
       return { style: 'percent' };
     case 'currency':
-      warnOnce(
+      warnDevOnce(
         '[velvet-i18n] `{value, number, currency}` defaults to USD. Prefer pre-formatting or `formatNumber(value, { style: "currency", currency: "..." })`.',
       );
       return { style: 'currency', currency: 'USD' };

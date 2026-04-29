@@ -1,27 +1,3 @@
-/**
- * MessageFormat AST.
- *
- * Supported placeholder forms (a strict subset of ICU MessageFormat,
- * extended with XML-style tag pairs for rich-text translation):
- *
- *   {name}                                          – simple interpolation
- *   {value, number}                                 – locale-default number
- *   {value, number, currency|percent|integer}       – preset number style
- *   {value, date|time, short|medium|long|full}      – preset date/time
- *   {n, plural, one {# row} other {# rows}}         – cardinal plural
- *   {n, plural, =0 {none} other {#}}                – exact-match branches
- *   {g, select, male {he} female {she} other {they}}
- *   <tag>...</tag>                                  – rich-text tag pair
- *   <tag/>                                          – rich-text empty tag (placeholder)
- *
- * `#` inside a plural body resolves to the formatted plural number.
- * Branch and tag bodies are themselves messages, so all forms nest arbitrarily.
- *
- * To emit a literal `<` or `{`, escape with single-quotes (ICU convention):
- *   "It''s here", "'<not a tag>'", "5 '{' 6 '}'"
- * `''` is always a literal apostrophe.
- */
-
 export interface LiteralNode {
   readonly type: 'literal';
   readonly value: string;
@@ -88,15 +64,6 @@ class Parser {
     return this.parseMessage(undefined);
   }
 
-  /**
-   * Parse a sequence of message nodes.
-   *
-   * `endTag`: when set, parsing stops at the matching `</endTag>`. When
-   * undefined and `insideBranch` is false, parsing runs to end of source
-   * and a stray `}` is treated as literal. When `insideBranch` is true
-   * (i.e. inside a plural/select body delimited by `{...}`) parsing
-   * stops at the next `}`.
-   */
   private parseMessage(endTag: string | undefined, insideBranch = false): ReadonlyArray<MessageNode> {
     const nodes: MessageNode[] = [];
     let buffer = '';
@@ -111,35 +78,31 @@ class Parser {
     while (this.cursor < this.source.length) {
       const char = this.source[this.cursor] ?? '';
 
-      // ICU single-quote escape: `''` -> literal `'`; `'X'` -> literal X
-      // where X is any run of chars until the next `'` (used to escape `{`, `}`, `<`).
       if (char === "'") {
         if (this.source[this.cursor + 1] === "'") {
           buffer += "'";
           this.cursor += 2;
           continue;
         }
-        // Only quote when next char is a syntax char; otherwise treat as literal apostrophe.
         const next = this.source[this.cursor + 1];
         if (next === '{' || next === '}' || next === '<' || next === '#') {
-          this.cursor += 1; // skip opening '
+          this.cursor += 1;
           while (this.cursor < this.source.length) {
-            const c = this.source[this.cursor] ?? '';
-            if (c === "'") {
+            const current = this.source[this.cursor] ?? '';
+            if (current === "'") {
               if (this.source[this.cursor + 1] === "'") {
                 buffer += "'";
                 this.cursor += 2;
                 continue;
               }
-              this.cursor += 1; // skip closing '
+              this.cursor += 1;
               break;
             }
-            buffer += c;
+            buffer += current;
             this.cursor += 1;
           }
           continue;
         }
-        // Lone apostrophe.
         buffer += "'";
         this.cursor += 1;
         continue;
@@ -163,18 +126,15 @@ class Parser {
       }
 
       if (char === '<') {
-        // Closing tag for the currently open tag context?
         if (endTag !== undefined && this.source.startsWith(`</${endTag}>`, this.cursor)) {
           break;
         }
-        // Opening or other closing tag?
         const opened = this.tryParseOpenTag();
         if (opened) {
           flushLiteral();
           nodes.push(opened);
           continue;
         }
-        // Treat as literal.
         buffer += char;
         this.cursor += 1;
         continue;
@@ -188,14 +148,8 @@ class Parser {
     return nodes;
   }
 
-  /**
-   * Try to parse `<tag>children</tag>` or self-closing `<tag/>` starting at
-   * the current cursor. Returns null if it doesn't look like a tag (cursor
-   * unchanged) — the caller falls back to literal `<`.
-   */
   private tryParseOpenTag(): TagNode | null {
     const rest = this.source.slice(this.cursor);
-    // Self-closing form first (greedier, so try it before the open form).
     const selfClose = /^<([A-Za-z_][\w-]*)\s*\/>/u.exec(rest);
     if (selfClose) {
       const name = selfClose[1] ?? '';
@@ -209,7 +163,6 @@ class Parser {
     this.cursor += match[0].length;
     const children = this.parseMessage(name, false);
     if (!this.source.startsWith(`</${name}>`, this.cursor)) {
-      // Unbalanced: rewind and treat opening `<tag>` as literal.
       this.cursor = startCursor;
       return null;
     }
@@ -233,19 +186,19 @@ class Parser {
 
     this.expect(',');
     this.skipWhitespace();
-    const fmt = this.readIdentifier();
+    const format = this.readIdentifier();
     this.skipWhitespace();
 
-    if (fmt === 'plural' || fmt === 'select') {
+    if (format === 'plural' || format === 'select') {
       this.expect(',');
       this.skipWhitespace();
       const branches = this.parseBranches();
       this.skipWhitespace();
       this.expect('}');
-      return { type: fmt, name, branches };
+      return { type: format, name, branches };
     }
 
-    if (fmt === 'number') {
+    if (format === 'number') {
       let style: string | undefined;
       if (this.peek() === ',') {
         this.cursor += 1;
@@ -257,7 +210,7 @@ class Parser {
       return { type: 'number', name, style };
     }
 
-    if (fmt === 'date' || fmt === 'time') {
+    if (format === 'date' || format === 'time') {
       let style: string | undefined;
       if (this.peek() === ',') {
         this.cursor += 1;
@@ -266,10 +219,10 @@ class Parser {
       }
       this.skipWhitespace();
       this.expect('}');
-      return { type: fmt, name, style };
+      return { type: format, name, style };
     }
 
-    throw new SyntaxError(`Unknown placeholder format "${fmt}" in "${this.source}"`);
+    throw new SyntaxError(`Unknown placeholder format "${format}" in "${this.source}"`);
   }
 
   private parseBranches(): ReadonlyArray<{ key: string; nodes: ReadonlyArray<MessageNode> }> {
@@ -327,12 +280,6 @@ class Parser {
   }
 }
 
-/**
- * Parse a MessageFormat template into an immutable AST.
- *
- * Throws `SyntaxError` on malformed input. Plain strings without
- * placeholders are valid messages and produce a single literal node.
- */
 export function parseMessage(template: string): ReadonlyArray<MessageNode> {
   return new Parser(template).parse();
 }

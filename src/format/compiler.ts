@@ -1,29 +1,17 @@
-/**
- * Compile a parsed MessageFormat AST into high-performance render functions.
- *
- * Two renderers are produced from the same AST:
- *   - `compileMessage(template)` -> `(params, locale) => string`
- *     Used by `t()` / `ts()`. Tag pairs (`<x>...</x>`) collapse to their
- *     inner text when rendered to a string.
- *   - `compileRichMessage(template)` -> `(params, locale) => RichNode[]`
- *     Used by `tx()`. Tag pairs become structured rich nodes that the
- *     `tx` runtime resolves to JSX via the caller-supplied tag handlers.
- *
- * Compiled functions are cached per template string so repeated calls
- * cost only a Map lookup plus the closure invocation.
- */
-
+import { warnDevOnce } from '../dev';
 import type { Locale, MessageParams } from '../types';
-import { getDateTimeFormat, getNumberFormat, getPluralRules, resolveDateTimeStyle, resolveNumberStyle } from './intl';
+import {
+  coerceDate,
+  getDateTimeFormat,
+  getNumberFormat,
+  getPluralRules,
+  resolveDateTimeStyle,
+  resolveNumberStyle,
+} from './intl';
 import { type MessageNode, parseMessage } from './parser';
 
 export type CompiledMessage = (params: MessageParams | undefined, locale: Locale) => string;
 
-/**
- * Structured rich-text output: either a plain text run or a tag with
- * recursively resolved child rich nodes. The runtime renders text runs
- * as-is and looks tags up in the caller-supplied handler map.
- */
 export type RichNode = string | { readonly tag: string; readonly children: ReadonlyArray<RichNode> };
 
 export type CompiledRichMessage = (params: MessageParams | undefined, locale: Locale) => ReadonlyArray<RichNode>;
@@ -41,28 +29,17 @@ const coerceNumber = (value: unknown): number => {
   return 0;
 };
 
-const coerceDate = (value: unknown): Date => {
-  if (value instanceof Date) return value;
-  if (typeof value === 'number' || typeof value === 'string') {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-  return new Date(0);
-};
-
-// ---- string renderer ----------------------------------------------------
-
 const renderNodes = (
   nodes: ReadonlyArray<MessageNode>,
   params: MessageParams | undefined,
   locale: Locale,
   poundValue: string,
 ): string => {
-  let out = '';
+  let output = '';
   for (const node of nodes) {
-    out += renderNode(node, params, locale, poundValue);
+    output += renderNode(node, params, locale, poundValue);
   }
-  return out;
+  return output;
 };
 
 const renderNode = (
@@ -94,33 +71,34 @@ const renderNode = (
       const value = coerceNumber(params?.[node.name]);
       const formatted = getNumberFormat(locale).format(value);
       const exactKey = `=${value}`;
-      const exact = node.branches.find((b) => b.key === exactKey);
+      const exact = node.branches.find((branch) => branch.key === exactKey);
       if (exact) return renderNodes(exact.nodes, params, locale, formatted);
       const category = getPluralRules(locale).select(value);
-      const branch = node.branches.find((b) => b.key === category) ?? node.branches.find((b) => b.key === 'other');
+      const branch =
+        node.branches.find((candidate) => candidate.key === category) ??
+        node.branches.find((candidate) => candidate.key === 'other');
       return branch ? renderNodes(branch.nodes, params, locale, formatted) : formatted;
     }
     case 'select': {
       const raw = params?.[node.name];
       const key = raw === undefined || raw === null ? 'other' : String(raw);
-      const branch = node.branches.find((b) => b.key === key) ?? node.branches.find((b) => b.key === 'other');
+      const branch =
+        node.branches.find((candidate) => candidate.key === key) ??
+        node.branches.find((candidate) => candidate.key === 'other');
       return branch ? renderNodes(branch.nodes, params, locale, '') : '';
     }
     case 'tag':
-      // Tag pairs collapse to inner text in plain-string render mode.
       return renderNodes(node.children, params, locale, poundValue);
   }
 };
 
-// ---- rich (JSX-aware) renderer ------------------------------------------
-
-const pushText = (out: RichNode[], text: string): void => {
+const pushText = (output: RichNode[], text: string): void => {
   if (text.length === 0) return;
-  const last = out[out.length - 1];
+  const last = output[output.length - 1];
   if (typeof last === 'string') {
-    out[out.length - 1] = last + text;
+    output[output.length - 1] = last + text;
   } else {
-    out.push(text);
+    output.push(text);
   }
 };
 
@@ -130,15 +108,15 @@ const renderRichNodes = (
   locale: Locale,
   poundValue: string,
 ): ReadonlyArray<RichNode> => {
-  const out: RichNode[] = [];
+  const output: RichNode[] = [];
   for (const node of nodes) {
-    appendRichNode(out, node, params, locale, poundValue);
+    appendRichNode(output, node, params, locale, poundValue);
   }
-  return out;
+  return output;
 };
 
 const appendRichNode = (
-  out: RichNode[],
+  output: RichNode[],
   node: MessageNode,
   params: MessageParams | undefined,
   locale: Locale,
@@ -146,45 +124,43 @@ const appendRichNode = (
 ): void => {
   switch (node.type) {
     case 'literal':
-      pushText(out, node.value);
+      pushText(output, node.value);
       return;
     case 'pound':
-      pushText(out, poundValue);
+      pushText(output, poundValue);
       return;
     case 'argument':
     case 'number':
     case 'date':
     case 'time':
     case 'select':
-      pushText(out, renderNode(node, params, locale, poundValue));
+      pushText(output, renderNode(node, params, locale, poundValue));
       return;
     case 'plural': {
       const value = coerceNumber(params?.[node.name]);
       const formatted = getNumberFormat(locale).format(value);
       const exactKey = `=${value}`;
       const branch =
-        node.branches.find((b) => b.key === exactKey) ??
-        node.branches.find((b) => b.key === getPluralRules(locale).select(value)) ??
-        node.branches.find((b) => b.key === 'other');
+        node.branches.find((candidate) => candidate.key === exactKey) ??
+        node.branches.find((candidate) => candidate.key === getPluralRules(locale).select(value)) ??
+        node.branches.find((candidate) => candidate.key === 'other');
       if (!branch) {
-        pushText(out, formatted);
+        pushText(output, formatted);
         return;
       }
       for (const child of branch.nodes) {
-        appendRichNode(out, child, params, locale, formatted);
+        appendRichNode(output, child, params, locale, formatted);
       }
       return;
     }
     case 'tag':
-      out.push({
+      output.push({
         tag: node.name,
         children: renderRichNodes(node.children, params, locale, poundValue),
       });
       return;
   }
 };
-
-// ---- public entry points ------------------------------------------------
 
 const passthroughString =
   (template: string): CompiledMessage =>
@@ -198,16 +174,13 @@ const passthroughRich =
 const parseSafely = (template: string): ReadonlyArray<MessageNode> | null => {
   try {
     return parseMessage(template);
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown parser error';
+    warnDevOnce(`[velvet-i18n] Failed to parse message template "${template}": ${reason}`);
     return null;
   }
 };
 
-/**
- * Compile a template into a `(params, locale) => string` function, cached
- * by template identity. Templates without placeholders short-circuit to a
- * constant returner. Tag pairs collapse to their inner text.
- */
 export function compileMessage(template: string): CompiledMessage {
   const cached = compileCache.get(template);
   if (cached) return cached;
@@ -230,11 +203,6 @@ export function compileMessage(template: string): CompiledMessage {
   return compiled;
 }
 
-/**
- * Compile a template into a `(params, locale) => RichNode[]` function.
- * Used by `tx()` to produce JSX-renderable output where `<tag>...</tag>`
- * pairs are preserved as structured nodes.
- */
 export function compileRichMessage(template: string): CompiledRichMessage {
   const cached = compileRichCache.get(template);
   if (cached) return cached;

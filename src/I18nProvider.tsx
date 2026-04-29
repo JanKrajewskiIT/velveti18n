@@ -11,8 +11,9 @@ import {
 } from 'solid-js';
 
 import { type ComposedDictionaries } from './defineDictionary';
+import { warnDevOnce } from './dev';
 import { compileMessage, compileRichMessage, type RichNode } from './format/compiler';
-import { getDateTimeFormat, getNumberFormat, getRelativeTimeFormat } from './format/intl';
+import { coerceDate, getDateTimeFormat, getNumberFormat, getRelativeTimeFormat } from './format/intl';
 import { type FlatDictionary, type Locale, type MessageParams, SUPPORTED_LOCALES, type VelvetI18nKey } from './types';
 
 const DEFAULT_STORAGE_KEY = 'velvet-locale';
@@ -23,33 +24,11 @@ const EMPTY_DICTIONARIES: ComposedDictionaries = Object.freeze({
   pl: Object.freeze({}) as FlatDictionary,
 });
 
-interface ImportMetaEnvLike {
-  DEV?: boolean;
-  MODE?: string;
-}
-
-const isDev = (): boolean => {
-  const env = (import.meta as { env?: ImportMetaEnvLike }).env;
-  if (!env) return false;
-  if (env.DEV !== undefined) return env.DEV;
-  if (env.MODE !== undefined) return env.MODE !== 'production';
-  return false;
-};
-
 const isSupportedLocale = (value: string): value is Locale =>
   (SUPPORTED_LOCALES as ReadonlyArray<string>).includes(value);
 
-const warnedMessages = new Set<string>();
-
-const warnOnce = (message: string): void => {
-  if (!isDev()) return;
-  if (warnedMessages.has(message)) return;
-  warnedMessages.add(message);
-  console.warn(message);
-};
-
 const warnMissing = (locale: Locale, key: string, fallbackLocale: Locale | null): void => {
-  warnOnce(
+  warnDevOnce(
     fallbackLocale
       ? `[velvet-i18n] Missing key "${key}" for locale "${locale}". Falling back to "${fallbackLocale}".`
       : `[velvet-i18n] Missing key "${key}" in every locale. Returning the key verbatim.`,
@@ -62,7 +41,12 @@ const canUseDocument = (): boolean => typeof document !== 'undefined';
 
 const detectInitialLocale = (storageKey: string): Locale => {
   if (!canUseWindow()) return DEFAULT_FALLBACK_LOCALE;
-  const stored = window.localStorage.getItem(storageKey);
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(storageKey);
+  } catch {
+    warnDevOnce(`[velvet-i18n] Failed to read locale from localStorage key "${storageKey}".`);
+  }
   if (stored && isSupportedLocale(stored)) return stored;
   const browser = window.navigator.language.split('-')[0];
   if (browser && isSupportedLocale(browser)) return browser;
@@ -71,7 +55,11 @@ const detectInitialLocale = (storageKey: string): Locale => {
 
 const persistLocale = (storageKey: string, locale: Locale): void => {
   if (canUseWindow()) {
-    window.localStorage.setItem(storageKey, locale);
+    try {
+      window.localStorage.setItem(storageKey, locale);
+    } catch {
+      warnDevOnce(`[velvet-i18n] Failed to persist locale to localStorage key "${storageKey}".`);
+    }
   }
   if (canUseDocument()) {
     document.documentElement.setAttribute('lang', locale);
@@ -80,31 +68,31 @@ const persistLocale = (storageKey: string, locale: Locale): void => {
 
 const stringParams = (params: RichMessageParams | undefined): MessageParams | undefined => {
   if (!params) return undefined;
-  const out: Record<string, string | number | boolean | Date | null | undefined> = {};
+  const output: Record<string, string | number | boolean | Date | null | undefined> = {};
   for (const key in params) {
     const value = params[key];
     if (typeof value === 'function') continue;
-    out[key] = value;
+    output[key] = value;
   }
-  return out;
+  return output;
 };
 
 const renderRichToJsx = (nodes: ReadonlyArray<RichNode>, params: RichMessageParams | undefined): JSX.Element => {
-  const out: JSX.Element[] = [];
+  const output: JSX.Element[] = [];
   for (const node of nodes) {
     if (typeof node === 'string') {
-      out.push(node);
+      output.push(node);
       continue;
     }
     const children = renderRichToJsx(node.children, params);
     const handler = params?.[node.tag];
     if (typeof handler === 'function') {
-      out.push(handler(children));
+      output.push(handler(children));
     } else {
-      out.push(children);
+      output.push(children);
     }
   }
-  return out;
+  return output;
 };
 
 export type TranslateFn = (key: VelvetI18nKey | (string & {}), params?: MessageParams) => string;
@@ -190,7 +178,7 @@ export const I18nProvider = (props: I18nProviderProps) => {
 
   const setLocale: I18nContextValue['setLocale'] = (next) => {
     if (!isSupportedLocale(next)) {
-      warnOnce(`[velvet-i18n] Ignored unsupported locale "${next}".`);
+      warnDevOnce(`[velvet-i18n] Ignored unsupported locale "${next}".`);
       return;
     }
     setLocaleSignal(next);
@@ -219,9 +207,7 @@ export const I18nProvider = (props: I18nProviderProps) => {
     getNumberFormat(locale(), options).format(value);
 
   const formatDate: I18nContextValue['formatDate'] = (value, options) =>
-    getDateTimeFormat(locale(), options ?? { dateStyle: 'medium' }).format(
-      value instanceof Date ? value : new Date(value),
-    );
+    getDateTimeFormat(locale(), options ?? { dateStyle: 'medium' }).format(coerceDate(value));
 
   const formatRelativeTime: I18nContextValue['formatRelativeTime'] = (value, unit, options) =>
     getRelativeTimeFormat(locale(), options).format(value, unit);
@@ -258,9 +244,7 @@ export const useI18n = (): I18nContextValue => {
     },
     formatNumber: (value, options) => getNumberFormat(DEFAULT_FALLBACK_LOCALE, options).format(value),
     formatDate: (value, options) =>
-      getDateTimeFormat(DEFAULT_FALLBACK_LOCALE, options ?? { dateStyle: 'medium' }).format(
-        value instanceof Date ? value : new Date(value),
-      ),
+      getDateTimeFormat(DEFAULT_FALLBACK_LOCALE, options ?? { dateStyle: 'medium' }).format(coerceDate(value)),
     formatRelativeTime: (value, unit, options) =>
       getRelativeTimeFormat(DEFAULT_FALLBACK_LOCALE, options).format(value, unit),
   };
