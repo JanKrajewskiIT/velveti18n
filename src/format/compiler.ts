@@ -190,6 +190,7 @@ const passthroughString =
   (template: string): CompiledMessage =>
   () =>
     template;
+
 const passthroughRich =
   (template: string): CompiledRichMessage =>
   () => [template];
