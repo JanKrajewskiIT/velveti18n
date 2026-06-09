@@ -1,2 +1,2 @@
-hook_dir="$(dirname "$0")"
+hook_dir=$(dirname -- "$0")
 . "$hook_dir/../node_modules/@jankrajewskiit/configs/husky/pre-commit.sh"

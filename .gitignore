@@ -1,6 +1,14 @@
 node_modules/
 dist/
-dist-ssr/
+.husky/_/
+
+*.log
+npm-debug.log*
+
+.DS_Store
+Thumbs.db
+.idea/
 *.local
-.env*
-AGENTS.md
+
+.env
+.env.*
