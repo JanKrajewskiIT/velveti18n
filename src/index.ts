@@ -1,26 +1,42 @@
-export type { ComposedDictionaries, DictionaryInput, LocaleDictionariesInput } from './defineDictionary';
-export { defineDictionaries, defineDictionary } from './defineDictionary';
-export type { CompiledMessage, CompiledRichMessage, RichNode } from './format/compiler';
-export { compileMessage, compileRichMessage } from './format/compiler';
+export {
+  createEmptyComposedDictionaries,
+  defineDictionaries,
+  defineDictionary,
+  flatten,
+  lookup,
+  mergeFlat,
+} from './dictionary';
+export type { LocaleDictionariesInput } from './dictionary';
+
+export { DEFAULT_STORAGE_KEY } from './detection';
+
+export { default as I18nProvider } from './I18nProvider';
+export type { I18nProviderProps } from './I18nProvider';
+
+export { default as useI18n } from './I18nContext';
+export { I18nContext } from './I18nContext';
+
 export type {
+  FormatDateFn,
+  FormatNumberFn,
+  FormatRelativeTimeFn,
   I18nContextValue,
-  I18nProviderProps,
-  RichMessageParams,
-  TagHandler,
   TranslateFn,
   TranslateRichFn,
   TranslateStaticFn,
-} from './I18nProvider';
-export { I18nProvider, useI18n } from './I18nProvider';
+} from './i18n-functions';
+
+export { DEFAULT_FALLBACK_LOCALE, SUPPORTED_LOCALES, isSupportedLocale } from './locales';
+export type { Locale } from './locales';
+
+export type { MessageParams, RichMessageParams, TagHandler } from './params';
+
 export type {
+  ComposedDictionaries,
   DictionaryNode,
   DotPath,
   FlatDictionary,
-  Locale,
-  MessageParams,
+  I18nDictionary,
+  I18nKey,
   TranslationOf,
-  VelvetI18nDictionary,
-  VelvetI18nKey,
 } from './types';
-export { SUPPORTED_LOCALES } from './types';
-export { flatten, getByPath, mergeFlat } from './utils';

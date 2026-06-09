@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   push:
@@ -9,5 +9,4 @@ on:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
-    secrets:
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+    secrets: inherit

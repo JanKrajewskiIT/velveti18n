@@ -1,4 +1,7 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+  "extends": "@jankrajewskiit/configs/tsconfig/lib",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "include": ["src"]
 }
