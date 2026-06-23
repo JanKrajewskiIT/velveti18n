@@ -60,7 +60,7 @@
     "@jankrajewskiit/configs": "^2.0.2",
     "eslint": ">=9.0.0",
     "husky": "^9.0.0",
-    "lint-staged": ">=17.0.0",
+    "lint-staged": ">=17.0.8",
     "prettier": ">=3.0.0",
     "publint": "^0.3.0",
     "solid-js": ">=1.9",
