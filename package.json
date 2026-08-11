@@ -62,7 +62,7 @@
     "husky": "^9.0.0",
     "lint-staged": ">=17.0.0",
     "prettier": ">=3.0.0",
-    "publint": "^0.3.0",
+    "publint": "^0.3.23",
     "solid-js": ">=1.9",
     "stylelint": ">=17.0.0",
     "typescript": ">=5.5.0",
