@@ -1,6 +1,6 @@
 {
   "name": "@jankrajewskiit/velvet-i18n",
-  "version": "0.1.0",
+  "version": "2.0.5",
   "description": "Type-safe, reactive internationalization for SolidJS.",
   "type": "module",
   "license": "MIT",
