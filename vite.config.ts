@@ -5,9 +5,11 @@ export default defineConfig(async () =>
   createSolidLibViteConfig(
     {},
     {
-      fileName: 'i18n',
+      fileName: 'index',
+      formats: ['es'],
       externalizeFromPackageJson: true,
       preserveModules: false,
+      dts: { rollupTypes: true },
     },
   ),
 );

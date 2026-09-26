@@ -1,48 +1,75 @@
-import { type Locale, SUPPORTED_LOCALES } from './locales';
-import type { ComposedDictionaries, DictionaryNode, FlatDictionary } from './types';
+import type { Locale } from './locales.js';
+import { SUPPORTED_LOCALES } from './locales.js';
+import type { ComposedDictionaries, DictionaryNode, FlatDictionary, LocaleDictionariesInput } from './types.js';
 
-export const flatten = (node: DictionaryNode, prefix = ''): Record<string, string> => {
-  const result: Record<string, string> = {};
-  for (const key of Object.keys(node)) {
-    const value = node[key];
+const createFlatRecord = (): Record<string, string> => Object.create(null) as Record<string, string>;
+
+const isDictionaryObject = (value: unknown): value is DictionaryNode => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Reflect.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+const flattenInto = (dictionary: DictionaryNode, target: Record<string, string>, prefix: string): void => {
+  for (const key of Object.keys(dictionary)) {
+    const value = dictionary[key];
     const path = prefix ? `${prefix}.${key}` : key;
+
     if (typeof value === 'string') {
-      result[path] = value;
-    } else if (value && typeof value === 'object') {
-      Object.assign(result, flatten(value, path));
+      target[path] = value;
+    } else if (isDictionaryObject(value)) {
+      flattenInto(value, target, path);
     }
   }
-  return result;
+};
+
+export const flatten = (dictionary: DictionaryNode): FlatDictionary => {
+  const flattened = createFlatRecord();
+  flattenInto(dictionary, flattened, '');
+  return Object.freeze(flattened);
 };
 
 export const mergeFlat = (...layers: readonly FlatDictionary[]): FlatDictionary => {
-  const merged: Record<string, string> = {};
-  for (const layer of layers) Object.assign(merged, layer);
+  const merged = createFlatRecord();
+
+  for (const layer of layers) {
+    for (const key of Object.keys(layer)) {
+      const value = layer[key];
+      if (Object.hasOwn(layer, key) && value !== undefined) {
+        merged[key] = value;
+      }
+    }
+  }
+
   return Object.freeze(merged);
 };
 
-export const lookup = (dictionary: FlatDictionary, key: string): string | undefined => dictionary[key];
+export const lookup = (dictionary: FlatDictionary, key: string): string | undefined =>
+  Object.hasOwn(dictionary, key) ? dictionary[key] : undefined;
 
 export const defineDictionary = <const T extends DictionaryNode>(dictionary: T): T => dictionary;
 
-export type LocaleDictionariesInput = {
-  readonly [L in Locale]: readonly DictionaryNode[];
-};
-
 export const createEmptyComposedDictionaries = (): ComposedDictionaries => {
-  const result = {} as Record<Locale, FlatDictionary>;
+  const empty = Object.freeze(createFlatRecord());
+  const result = Object.create(null) as Record<Locale, FlatDictionary>;
+
   for (const locale of SUPPORTED_LOCALES) {
-    result[locale] = Object.freeze({});
+    result[locale] = empty;
   }
+
   return Object.freeze(result);
 };
 
 export const defineDictionaries = (input: LocaleDictionariesInput): ComposedDictionaries => {
-  const result = {} as Record<Locale, FlatDictionary>;
+  const composed = Object.create(null) as Record<Locale, FlatDictionary>;
+
   for (const locale of SUPPORTED_LOCALES) {
-    const layers = input[locale];
-    const flatLayers = layers.map((layer) => flatten(layer));
-    result[locale] = mergeFlat(...flatLayers);
+    const layers = input[locale].map((layer) => flatten(layer));
+    composed[locale] = mergeFlat(...layers);
   }
-  return Object.freeze(result);
+
+  return Object.freeze(composed);
 };

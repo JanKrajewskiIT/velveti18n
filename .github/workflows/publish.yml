@@ -1,4 +1,4 @@
-name: publish
+name: Publish
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 concurrency:
-  group: publish-${{ github.ref }}
+  group: publish-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -17,15 +17,23 @@ jobs:
   check-version:
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Compare tag with package version
+      - name: Check release tag and package version
+        shell: bash
         run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag must match v<semver>."
+            exit 1
+          fi
           tag_version="${GITHUB_REF_NAME#v}"
           pkg_version="$(node -p "require('./package.json').version")"
           if [ "$tag_version" != "$pkg_version" ]; then
-            echo "Tag version ($tag_version) does not match package.json version ($pkg_version)."
+            echo "::error::package.json version $pkg_version does not match tag $GITHUB_REF_NAME"
             exit 1
           fi
 
@@ -37,21 +45,23 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
           registry-url: https://npm.pkg.github.com
+          scope: '@jankrajewskiit'
 
       - name: Install dependencies
         run: npm ci
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Publish
+      - name: Publish package with provenance
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

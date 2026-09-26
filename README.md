@@ -1,46 +1,45 @@
-# @jankrajewskiit/i18n
+# VelvetI18n
 
-Headless, type-safe internationalization for SolidJS: locale management, multi-layer dictionary composition, ICU MessageFormat translation, rich-text rendering with JSX tag handlers, and locale-aware Intl formatting. ESM-only, side-effect-free, zero runtime dependencies beyond SolidJS.
+Type-safe, reactive internationalization for SolidJS applications and libraries. VelvetI18n provides one locale context, layered dictionaries, ICU MessageFormat subset rendering, rich-text tag handlers, and locale-aware `Intl` formatters.
 
 ## Install
 
 ```sh
-npm install @jankrajewskiit/i18n
+npm install @jankrajewskiit/velvet-i18n
 ```
 
-Add the scope-to-registry mapping to your `.npmrc`:
+SolidJS `>=1.9.0` is a peer dependency. Configure the GitHub Packages registry for the `@jankrajewskiit` scope in `.npmrc`:
 
-```
+```ini
 @jankrajewskiit:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GHCR_TOKEN}
 ```
 
-Peer dependencies:
+Set `GHCR_TOKEN` to a token authorized to read packages from the organization. Do not commit the token.
 
-| Peer       | Minimum version |
-| ---------- | --------------- |
-| `solid-js` | `>=1.9`         |
+## Integration
 
-## Integration overview
+Define each locale dictionary at module scope, then compose the layers once:
 
 ```tsx
-import { render } from 'solid-js/web';
-import { I18nProvider, defineDictionary, defineDictionaries, useI18n, type TranslationOf } from '@jankrajewskiit/i18n';
+import { defineDictionaries, defineDictionary, I18nProvider, useI18n } from '@jankrajewskiit/velvet-i18n';
+import type { TranslationOf } from '@jankrajewskiit/velvet-i18n';
 
 const en = defineDictionary({
   app: {
     greeting: 'Hello, {name}!',
-    items: '{count, plural, one {# item} other {# items}}',
-    terms: 'Read the <link>terms</link>.',
-    updated: 'Updated {date, date, long}',
+    itemCount: '{count, plural, one {# item} other {# items}}',
+    linkedText: 'Read the <link>guide</link>',
+    updatedAt: 'Updated {date, date, medium}',
   },
 });
 
 const pl: TranslationOf<typeof en> = {
   app: {
     greeting: 'Cześć, {name}!',
-    items: '{count, plural, one {# rzecz} few {# rzeczy} many {# rzeczy} other {# rzeczy}}',
-    terms: 'Przeczytaj <link>regulamin</link>.',
-    updated: 'Zaktualizowano {date, date, long}',
+    itemCount: '{count, plural, one {# element} few {# elementy} many {# elementów} other {# elementu}}',
+    linkedText: 'Przeczytaj <link>przewodnik</link>',
+    updatedAt: 'Zaktualizowano {date, date, medium}',
   },
 };
 
@@ -49,97 +48,66 @@ const dictionaries = defineDictionaries({
   pl: [pl],
 });
 
-const Demo = () => {
-  const { ts, tx, formatDate, setLocale } = useI18n();
+declare module '@jankrajewskiit/velvet-i18n' {
+  interface I18nDictionary extends Pick<typeof en, keyof typeof en> {}
+}
+
+const App = () => {
+  const { ts, tx, formatDate } = useI18n();
+
   return (
-    <section>
+    <>
       <p>{ts('app.greeting', { name: 'Ada' })}</p>
-      <p>{ts('app.items', { count: 3 })}</p>
-      <p>{tx('app.terms', { link: (children) => <a href="/terms">{children}</a> })}</p>
-      <p>{ts('app.updated', { date: new Date() })}</p>
-      <button onClick={() => setLocale('pl')}>Polski</button>
-    </section>
+      <p>{ts('app.updatedAt', { date: new Date() })}</p>
+      <p>{formatDate(new Date())}</p>
+      {tx('app.linkedText', {
+        link: (children) => <a href="/guide">{children}</a>,
+      })}
+    </>
   );
 };
 
-render(
-  () => (
-    <I18nProvider dictionaries={dictionaries} fallbackLocale="en">
-      <Demo />
-    </I18nProvider>
-  ),
-  document.getElementById('root')!,
+export const Root = () => (
+  <I18nProvider dictionaries={dictionaries}>
+    <App />
+  </I18nProvider>
 );
 ```
 
-Register your dictionary for compile-time key safety (e.g. `src/i18n.d.ts`, included in `tsconfig.json`):
+Keep dictionary definitions and `defineDictionaries()` at module scope. Each library or application must own a distinct top-level namespace when augmenting `I18nDictionary`.
 
-```ts
-import type en from './dictionaries/en';
+## Public API
 
-declare module '@jankrajewskiit/i18n' {
-  interface I18nDictionary extends Pick<typeof en, 'app'> {}
-}
-```
-
-Each dictionary author MUST own a disjoint top-level namespace (e.g. `app`, `ui`). Overlapping top-level keys across augmentations collapse leaf types to `never`.
-
-## Public surface
-
-| Export                                                       | Kind      | Description                                                                      |
-| ------------------------------------------------------------ | --------- | -------------------------------------------------------------------------------- |
-| `I18nProvider`                                               | Component | Root provider establishing the reactive i18n context for its subtree.            |
-| `I18nProviderProps`                                          | Type      | Provider props: `dictionaries`, `storageKey`, `initialLocale`, `fallbackLocale`. |
-| `useI18n`                                                    | Hook      | Returns the reactive `I18nContextValue`; a non-crashing stub outside a provider. |
-| `I18nContextValue`                                           | Type      | Shape of the value returned by `useI18n`.                                        |
-| `defineDictionary`                                           | Function  | Identity helper preserving literal types for `DotPath`/`TranslationOf`.          |
-| `defineDictionaries`                                         | Function  | Flattens and merges per-locale layers into a frozen `ComposedDictionaries`.      |
-| `createEmptyComposedDictionaries`                            | Function  | Frozen empty per-locale dictionary record.                                       |
-| `flatten` / `mergeFlat` / `lookup`                           | Functions | Dictionary primitives.                                                           |
-| `SUPPORTED_LOCALES`                                          | Constant  | Readonly ordered list of supported locales.                                      |
-| `DEFAULT_FALLBACK_LOCALE`                                    | Constant  | The hard-coded fallback locale (`"en"`).                                         |
-| `DEFAULT_STORAGE_KEY`                                        | Constant  | Default `localStorage` key (`"velvet-locale"`).                                  |
-| `isSupportedLocale`                                          | Function  | Runtime type guard for `Locale`.                                                 |
-| `Locale`                                                     | Type      | Union of supported locale strings.                                               |
-| `I18nDictionary`                                             | Interface | Augmentable global key-set interface.                                            |
-| `I18nKey`                                                    | Type      | Conditional key type (`string` or `DotPath<I18nDictionary>`).                    |
-| `DotPath<T>`                                                 | Type util | Derives dotted leaf paths from a literal-typed object type.                      |
-| `TranslationOf<T>`                                           | Type util | Maps a literal-typed dictionary to its translation mirror.                       |
-| `DictionaryNode` / `FlatDictionary` / `ComposedDictionaries` | Types     | Dictionary shapes.                                                               |
-| `MessageParams` / `RichMessageParams` / `TagHandler`         | Types     | Translation parameter shapes.                                                    |
-| `TranslateFn` / `TranslateStaticFn` / `TranslateRichFn`      | Types     | `t` / `ts` / `tx` signatures.                                                    |
-| `FormatNumberFn` / `FormatDateFn` / `FormatRelativeTimeFn`   | Types     | Formatter signatures.                                                            |
-
-`ts` is the strict counterpart of `t` (literal keys only); `tx` returns a `JSX.Element` and accepts `TagHandler` values keyed by tag name.
+| Export                                                                                          | Purpose                                                                                    |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `I18nProvider`                                                                                  | Root provider for locale, dictionaries, translation, and formatting.                       |
+| `I18nContext`, `useI18n`                                                                        | Context and reactive accessor; outside a provider, `useI18n` returns a safe `en` fallback. |
+| `SUPPORTED_LOCALES`, `DEFAULT_FALLBACK_LOCALE`, `DEFAULT_STORAGE_KEY`, `isSupportedLocale`      | Supported locales and locale configuration constants.                                      |
+| `defineDictionary`, `defineDictionaries`, `createEmptyComposedDictionaries`                     | Literal dictionary typing and locale-layer composition.                                    |
+| `flatten`, `mergeFlat`, `lookup`                                                                | Dictionary transformation and own-entry lookup helpers.                                    |
+| `Locale`, `LocaleDictionariesInput`, `DictionaryNode`, `FlatDictionary`, `ComposedDictionaries` | Locale and dictionary contracts.                                                           |
+| `I18nDictionary`, `I18nKey`, `DotPath`, `TranslationOf`                                         | Module augmentation and dictionary type utilities.                                         |
+| `I18nProviderProps`, `I18nContextValue`                                                         | Provider and context contracts.                                                            |
+| `MessageParams`, `RichMessageParams`, `TagHandler`                                              | Translation parameter contracts.                                                           |
+| `TranslateFn`, `TranslateStaticFn`, `TranslateRichFn`                                           | `t`, `ts`, and `tx` function contracts.                                                    |
+| `FormatNumberFn`, `FormatDateFn`, `FormatRelativeTimeFn`                                        | Locale-aware formatter contracts.                                                          |
 
 ## Upgrading
 
-See [CHANGELOG.md](./CHANGELOG.md). Behavioral changes to any documented requirement are breaking and bump the major version.
+See [CHANGELOG.md](CHANGELOG.md) for version history and compatibility notes. Breaking changes are released as major versions.
 
 ## Provenance verification
 
-This package is published with an npm provenance attestation. Verify a downloaded version with:
-
 ```sh
-npm audit signatures @jankrajewskiit/i18n
+npm audit signatures @jankrajewskiit/velvet-i18n
 ```
 
-A passing audit attests that the published artifact was built and signed by the project's CI release pipeline against the tagged source commit.
+A passing audit verifies the registry signature and provenance attestation for the installed package.
 
 ## Release workflow
 
-1. Bump `version` in `package.json` and add a `CHANGELOG.md` section.
-2. Commit, then tag: `git tag v<semver>`.
-3. Push the tag: `git push origin v<semver>`.
-
-Pushing a `v<semver>` tag is the only trigger that publishes. For a broken release, publish a superseding patch and run `npm deprecate @jankrajewskiit/i18n@<version> "<reason>"`. Never `npm unpublish`.
+Update the version and changelog, commit the change, create a matching `v<semver>` tag, then push the tag. CI verifies the package and version before publishing with provenance. For a broken release, publish a superseding patch and deprecate the affected version with `npm deprecate @jankrajewskiit/velvet-i18n@<version>`; do not unpublish it.
 
 ## Branch protection
 
-Default-branch protection MUST require:
-
-- passing `verify` status check,
-- passing audit status check,
-- at least one approving CODEOWNERS review,
-- an up-to-date branch,
-- force pushes and non-administrative direct pushes disabled.
+For the default branch, require the passing verify status (including the high-severity audit), at least one approving CODEOWNERS review, and an up-to-date branch. Disable force pushes and non-administrative direct pushes.

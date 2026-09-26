@@ -1,91 +1,103 @@
-import { createEffect, createMemo, createSignal, on, type ParentProps } from 'solid-js';
+import { type Component, createEffect, createMemo, createSignal, onMount } from 'solid-js';
 
-import { DEFAULT_STORAGE_KEY, detectLocale, persistLocale, setDocumentLang } from './detection';
-import { createEmptyComposedDictionaries } from './dictionary';
-import { createI18nFunctions } from './i18n-functions';
-import { I18nContext } from './I18nContext';
-import { warnOnce } from './internal/env';
-import { DEFAULT_FALLBACK_LOCALE, isSupportedLocale, type Locale } from './locales';
-import type { ComposedDictionaries, FlatDictionary } from './types';
+import { createEmptyComposedDictionaries, lookup } from './dictionary.js';
+import { detectLocale, persistLocale, setDocumentLanguage, warnOnce } from './env.js';
+import { I18nContext } from './I18nContext.js';
+import { formatDateForLocale, formatNumberForLocale, formatRelativeTimeForLocale } from './intl.js';
+import { DEFAULT_FALLBACK_LOCALE, DEFAULT_STORAGE_KEY, isSupportedLocale } from './locales.js';
+import { formatMessage, formatRichMessage } from './message/render.js';
+import type { I18nContextValue, I18nProviderProps, MessageParams, RichMessageParams } from './types.js';
 
-export interface I18nProviderProps {
-  dictionaries?: ComposedDictionaries;
-  storageKey?: string;
-  initialLocale?: Locale;
-  fallbackLocale?: Locale;
-}
+export const I18nProvider: Component<I18nProviderProps> = (props) => {
+  const initialLocale = isSupportedLocale(props.initialLocale) ? props.initialLocale : DEFAULT_FALLBACK_LOCALE;
+  const [locale, setLocaleSignal] = createSignal(initialLocale);
+  const [initialized, setInitialized] = createSignal(false);
 
-const EMPTY_COMPOSED = createEmptyComposedDictionaries();
-const EMPTY_DICTIONARY: FlatDictionary = Object.freeze({});
-
-const I18nProvider = (props: ParentProps<I18nProviderProps>) => {
-  const storageKey = createMemo(() => props.storageKey ?? DEFAULT_STORAGE_KEY);
-
-  const fallbackLocale = createMemo<Locale>(() => {
-    const value = props.fallbackLocale;
-    if (value === undefined) return DEFAULT_FALLBACK_LOCALE;
-    if (!isSupportedLocale(value)) {
-      warnOnce(
-        `bad-fallback:${String(value)}`,
-        `[i18n] Unsupported fallbackLocale "${String(value)}"; using "${DEFAULT_FALLBACK_LOCALE}".`,
-      );
+  const resolvedFallbackLocale = createMemo(() => {
+    const configuredLocale = props.fallbackLocale;
+    if (configuredLocale === undefined) {
       return DEFAULT_FALLBACK_LOCALE;
     }
-    return value;
+    if (isSupportedLocale(configuredLocale)) {
+      return configuredLocale;
+    }
+
+    warnOnce('invalid-fallback-locale', 'Unsupported fallback locale; using "en".');
+    return DEFAULT_FALLBACK_LOCALE;
   });
 
-  const initialLocale = props.initialLocale ?? detectLocale(props.storageKey ?? DEFAULT_STORAGE_KEY);
-  const [locale, setLocaleSignal] = createSignal<Locale>(initialLocale);
+  const composedDictionaries = createMemo(() => props.dictionaries ?? createEmptyComposedDictionaries());
+  const activeDictionary = createMemo(() => composedDictionaries()[locale()]);
+  const fallbackDictionary = createMemo(() => composedDictionaries()[resolvedFallbackLocale()]);
 
-  const setLocale = (next: Locale): void => {
-    if (!isSupportedLocale(next)) {
-      warnOnce(
-        `bad-set-locale:${String(next)}`,
-        `[i18n] setLocale received unsupported locale "${String(next)}"; ignoring.`,
-      );
+  const setLocale: I18nContextValue['setLocale'] = (nextLocale) => {
+    if (!isSupportedLocale(nextLocale)) {
+      warnOnce(`invalid-set-locale:${String(nextLocale)}`, `Unsupported locale "${String(nextLocale)}" was ignored.`);
       return;
     }
-    setLocaleSignal(next);
+
+    setLocaleSignal(nextLocale);
   };
 
-  const composed = createMemo<ComposedDictionaries>(() => props.dictionaries ?? EMPTY_COMPOSED);
-  const activeDictionary = createMemo<FlatDictionary>(() => composed()[locale()] ?? EMPTY_DICTIONARY);
-  const fallbackDictionary = createMemo<FlatDictionary>(() => composed()[fallbackLocale()] ?? EMPTY_DICTIONARY);
+  onMount(() => {
+    const configuredLocale: unknown = props.initialLocale;
+    if (configuredLocale === undefined) {
+      setLocaleSignal(detectLocale(props.storageKey ?? DEFAULT_STORAGE_KEY));
+    } else if (isSupportedLocale(configuredLocale)) {
+      setLocaleSignal(configuredLocale);
+    } else {
+      warnOnce('invalid-initial-locale', 'Unsupported initial locale; detecting locale instead.');
+      setLocaleSignal(detectLocale(props.storageKey ?? DEFAULT_STORAGE_KEY));
+    }
 
-  createEffect(
-    on(locale, (current) => {
-      persistLocale(storageKey(), current);
-      setDocumentLang(current);
-    }),
-  );
-
-  createEffect(
-    on(
-      () => props.initialLocale,
-      (next) => {
-        if (next === undefined) return;
-        if (!isSupportedLocale(next)) {
-          warnOnce(
-            `bad-initial-locale:${String(next)}`,
-            `[i18n] Unsupported initialLocale "${String(next)}"; keeping current locale.`,
-          );
-          return;
-        }
-        setLocaleSignal(next);
-      },
-      { defer: true },
-    ),
-  );
-
-  const value = createI18nFunctions({
-    locale,
-    setLocale,
-    activeDictionary,
-    fallbackDictionary,
-    hasDictionaries: true,
+    setInitialized(true);
   });
 
-  return <I18nContext.Provider value={value}>{props.children}</I18nContext.Provider>;
-};
+  createEffect(() => {
+    const configuredLocale: unknown = props.initialLocale;
+    if (configuredLocale === undefined) {
+      return;
+    }
+    if (isSupportedLocale(configuredLocale)) {
+      setLocaleSignal(configuredLocale);
+      return;
+    }
 
-export default I18nProvider;
+    warnOnce('invalid-initial-locale', 'Unsupported initial locale was ignored.');
+  });
+
+  createEffect(() => {
+    const activeLocale = locale();
+    if (!initialized()) {
+      return;
+    }
+
+    persistLocale(props.storageKey ?? DEFAULT_STORAGE_KEY, activeLocale);
+    setDocumentLanguage(activeLocale);
+  });
+
+  const translate = (key: string, params: MessageParams = {}) => {
+    const activeLocale = locale();
+    const template = lookup(activeDictionary(), key) ?? lookup(fallbackDictionary(), key);
+    return formatMessage(template ?? key, params, activeLocale);
+  };
+
+  const translateRich = (key: string, params: RichMessageParams = {}) => {
+    const activeLocale = locale();
+    const template = lookup(activeDictionary(), key) ?? lookup(fallbackDictionary(), key);
+    return formatRichMessage(template ?? key, params, activeLocale);
+  };
+
+  const contextValue: I18nContextValue = {
+    locale,
+    setLocale,
+    t: translate,
+    ts: translate,
+    tx: translateRich,
+    formatNumber: (value, options) => formatNumberForLocale(locale(), value, options),
+    formatDate: (value, options) => formatDateForLocale(locale(), value, options),
+    formatRelativeTime: (value, unit, options) => formatRelativeTimeForLocale(locale(), value, unit, options),
+  };
+
+  return <I18nContext.Provider value={contextValue}>{props.children}</I18nContext.Provider>;
+};

@@ -1,49 +1,24 @@
-export interface TextNode {
-  readonly type: 'text';
-  readonly value: string;
+export type MessageNode =
+  | { readonly type: 'text'; readonly value: string }
+  | { readonly type: 'pound' }
+  | {
+      readonly type: 'argument';
+      readonly name: string;
+      readonly format: 'simple' | 'number' | 'date' | 'time';
+      readonly style?: string;
+    }
+  | {
+      readonly type: 'choice';
+      readonly name: string;
+      readonly mode: 'plural' | 'select';
+      readonly branches: Readonly<Record<string, readonly MessageNode[]>>;
+    }
+  | {
+      readonly type: 'tag';
+      readonly name: string;
+      readonly children: readonly MessageNode[];
+    };
+
+export interface ParsedMessage {
+  readonly nodes: readonly MessageNode[];
 }
-
-export interface ArgNode {
-  readonly type: 'arg';
-  readonly name: string;
-}
-
-export interface NumberNode {
-  readonly type: 'number';
-  readonly name: string;
-  readonly style?: string;
-}
-
-export interface DateNode {
-  readonly type: 'date';
-  readonly name: string;
-  readonly kind: 'date' | 'time';
-  readonly style?: string;
-}
-
-export interface PluralNode {
-  readonly type: 'plural';
-  readonly name: string;
-  readonly exact: ReadonlyMap<string, readonly MessageNode[]>;
-  readonly categories: ReadonlyMap<string, readonly MessageNode[]>;
-}
-
-export interface SelectNode {
-  readonly type: 'select';
-  readonly name: string;
-  readonly branches: ReadonlyMap<string, readonly MessageNode[]>;
-}
-
-export interface PoundNode {
-  readonly type: 'pound';
-}
-
-export interface TagNode {
-  readonly type: 'tag';
-  readonly name: string;
-  readonly children: readonly MessageNode[];
-}
-
-export type MessageNode = TextNode | ArgNode | NumberNode | DateNode | PluralNode | SelectNode | PoundNode | TagNode;
-
-export type RichNode = string | { readonly tag: string; readonly children: readonly RichNode[] };

@@ -1,5 +1,3 @@
-export { DEFAULT_STORAGE_KEY } from './detection';
-export type { LocaleDictionariesInput } from './dictionary';
 export {
   createEmptyComposedDictionaries,
   defineDictionaries,
@@ -7,29 +5,29 @@ export {
   flatten,
   lookup,
   mergeFlat,
-} from './dictionary';
-export type {
-  FormatDateFn,
-  FormatNumberFn,
-  FormatRelativeTimeFn,
-  I18nContextValue,
-  TranslateFn,
-  TranslateRichFn,
-  TranslateStaticFn,
-} from './i18n-functions';
-export { default as useI18n } from './I18nContext';
-export { I18nContext } from './I18nContext';
-export type { I18nProviderProps } from './I18nProvider';
-export { default as I18nProvider } from './I18nProvider';
-export type { Locale } from './locales';
-export { DEFAULT_FALLBACK_LOCALE, isSupportedLocale, SUPPORTED_LOCALES } from './locales';
-export type { MessageParams, RichMessageParams, TagHandler } from './params';
+} from './dictionary.js';
+export { I18nContext, useI18n } from './I18nContext.js';
+export { I18nProvider } from './I18nProvider.js';
+export { DEFAULT_FALLBACK_LOCALE, DEFAULT_STORAGE_KEY, isSupportedLocale, SUPPORTED_LOCALES } from './locales.js';
 export type {
   ComposedDictionaries,
   DictionaryNode,
   DotPath,
   FlatDictionary,
+  FormatDateFn,
+  FormatNumberFn,
+  FormatRelativeTimeFn,
+  I18nContextValue,
   I18nDictionary,
   I18nKey,
+  I18nProviderProps,
+  Locale,
+  LocaleDictionariesInput,
+  MessageParams,
+  RichMessageParams,
+  TagHandler,
+  TranslateFn,
+  TranslateRichFn,
+  TranslateStaticFn,
   TranslationOf,
-} from './types';
+} from './types.js';
