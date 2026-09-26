@@ -47,22 +47,23 @@ tx("some.key", {
 
 If a tag appears in the template but no handler is supplied for its name, the library MUST render the tag's children directly, without a wrapper, as if the tag were transparent.
 
-A self-closing tag (`<tagName />`) invokes the handler with an empty children value (an empty string or empty fragment). When no handler is supplied for a self-closing tag, it MUST render as an empty string.
+A self-closing tag (`<tagName />`) invokes the handler with empty children. When no handler is supplied for a self-closing tag, it MUST render no content.
 
-## Step 3 — RichNode intermediate representation
+## Step 3 — Rich-text output semantics
 
-During compilation, rich-text templates are compiled to a tree of `RichNode` values:
+Implementations may use any internal representation that preserves tag boundaries and text order. Conceptually, the message consists of text segments and nested tag nodes:
 
 ```typescript
 type RichNode = string | { readonly tag: string; readonly children: ReadonlyArray<RichNode> };
 ```
 
-- Adjacent text segments MUST be concatenated into a single string node to minimize tree depth.
-- The compiled tree is produced by the `compileRichMessage` function (analogous to `compileMessage` in [04-message-format](04-message-format.md) Step 9) and cached by template string.
+This type is an explanatory model only; it is not a required internal or exported type.
 
-## Step 4 — RichNode to JSX rendering
+- Adjacent text segments MUST render in their original order and MUST NOT introduce visible separators.
 
-When `tx` renders a compiled rich-text message, it walks the `RichNode` tree and applies the caller-supplied handlers:
+## Step 4 — Tag rendering to JSX
+
+When `tx` renders a rich-text message, it preserves text order and tag nesting while applying the caller-supplied handlers:
 
 1. String nodes are emitted as literal text children.
 2. Tag nodes look up the tag name in the supplied `RichMessageParams`. If a `TagHandler` is found, it is called with the recursively rendered children. If no handler is found, the children are rendered directly.
@@ -79,13 +80,8 @@ Rich-text templates MAY mix tag syntax and plain `{name}` placeholders in the sa
 
 Plain placeholder parameters and tag handler parameters coexist in the same `RichMessageParams` record. The library MUST distinguish them by value type: a function value is treated as a `TagHandler`; all other value types are treated as plain `MessageParams` values and substituted as described in [04-message-format](04-message-format.md) Step 2.
 
-## Step 6 — Compilation and caching
+## Step 6 — Parsing and error handling
 
-Rich-text templates are compiled and cached separately from plain-text templates:
+Rich-text templates are parsed when a translation call requires them. Implementations MAY cache parse results; cache scope, eviction, and compiled-function identity are not public contracts. Templates containing neither `{` nor `<` render as plain text.
 
-- A separate module-level cache (distinct from the plain-text cache) is keyed by template string.
-- The first call with a given template string parses and compiles it to a `CompiledRichMessage` function: `(params, locale) => ReadonlyArray<RichNode>`.
-- Subsequent calls retrieve the compiled function from cache.
-- Templates containing neither `{` nor `<` are returned as a single-element string array directly, without a compiled function entry.
-
-The same error-handling rules from [04-message-format](04-message-format.md) Step 8 apply: parse errors emit a development-only warning and fall back to a passthrough result.
+The same error-handling rules from [04-message-format](04-message-format.md) Step 8 apply: parse errors MAY emit a development-only warning and MUST fall back to a passthrough result. An unmatched or mismatched opening tag is treated as a literal `<` and parsing resumes immediately after that character; it does not by itself make the whole template a parse error.

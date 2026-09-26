@@ -37,8 +37,8 @@ This mechanism allows a consumer to drive the active locale from an external sig
 
 The library MUST export:
 
-- A type alias `Locale` representing the union of all supported locale strings (e.g., `'en' | 'pl'`).
-- A readonly array constant `SUPPORTED_LOCALES` listing every member of the `Locale` union in a stable order.
+- A type alias `Locale` equal to `'en' | 'pl'`.
+- A readonly array constant `SUPPORTED_LOCALES` equal to `['en', 'pl']` in that stable order.
 
 `SUPPORTED_LOCALES` is the single authoritative source used by the detection sequence (Step 1), `setLocale` validation ([01-configuration](01-configuration.md) Step 4), fallback locale validation ([01-configuration](01-configuration.md) Step 2), and the type system ([08-type-safety](08-type-safety.md)).
 

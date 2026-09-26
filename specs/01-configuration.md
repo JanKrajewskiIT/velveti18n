@@ -25,7 +25,7 @@ When the storage key prop is absent or undefined, the resolved storage key MUST 
 
 On mount, the provider MUST:
 
-1. Resolve the initial active locale using the detection sequence described in [02-locale-detection-and-persistence](02-locale-detection-and-persistence.md), unless `initialLocale` is supplied, in which case that value is used directly without consulting storage or navigator.
+1. Resolve the initial active locale using the detection sequence described in [02-locale-detection-and-persistence](02-locale-detection-and-persistence.md), unless a valid `initialLocale` is supplied, in which case that value is used directly without consulting storage or navigator.
 2. Create a reactive locale signal initialized to the resolved locale.
 3. Derive memoized accessors for the active locale's flat dictionary and the fallback locale's flat dictionary from the `composedDictionaries` prop.
 4. Register a reactive effect that persists the locale to storage and updates `document.documentElement.lang` whenever the locale signal changes. See [02-locale-detection-and-persistence](02-locale-detection-and-persistence.md).

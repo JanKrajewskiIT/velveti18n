@@ -28,7 +28,7 @@ When `useI18n()` is called outside a mounted provider (e.g., in unit tests, in S
 | Field                | Stub behavior                                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `locale()`           | Returns the default fallback locale (`"en"`).                                                                     |
-| `setLocale`          | No-op. MUST emit a development-only warning once per call site.                                                   |
+| `setLocale`          | No-op. MAY emit a development-only warning.                                                                       |
 | `t(key, params?)`    | Returns the compiled template for `key` with params applied, treating `key` itself as the template (passthrough). |
 | `ts(key, params?)`   | Same as `t`.                                                                                                      |
 | `tx(key, params?)`   | Returns the compiled rich-text output for `key` with params applied, treating `key` itself as the template.       |
@@ -36,7 +36,7 @@ When `useI18n()` is called outside a mounted provider (e.g., in unit tests, in S
 | `formatDate`         | Formats using the default fallback locale.                                                                        |
 | `formatRelativeTime` | Formats using the default fallback locale.                                                                        |
 
-The stub MUST NOT throw under any circumstance. Its purpose is to keep primitive library components and isolated unit tests functional without a provider tree.
+The stub MUST tolerate an absent provider and absent browser globals. Invalid caller-supplied `Intl` options or invalid date values follow the error behavior specified in [04-message-format](04-message-format.md) and [07-intl-formatting](07-intl-formatting.md); the stub does not promise to suppress those errors.
 
 ## Step 3 — Required integration ordering
 
@@ -84,13 +84,26 @@ Library authors who ship their own translation layer MUST also augment `I18nDict
 
 Each augmenting module MUST only augment with its own namespace. Augmenting with a type that introduces keys outside the author's designated namespace MUST be avoided to prevent conflicts with other augmentations.
 
-## Step 6 — Anti-patterns the library MUST make difficult
+## Step 6 — Public entry-point exports
 
-| Anti-pattern                                                                  | Why wrong                                                                              | How the library helps                                                                                          |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Calling `defineDictionaries` inside a component function                      | Creates a new `ComposedDictionaries` reference on every render, defeating memo caching | Document the module-scope requirement; the provider's memo is invalidated on reference change.                 |
-| Augmenting `I18nDictionary` with overlapping top-level keys                   | Produces `never` leaf types, causing `I18nKey` to become `never`                       | Document namespace ownership; TypeScript surfaces the resulting type errors.                                   |
-| Passing a raw plain object as `dictionaries` instead of the factory output    | No type guarantee of frozen per-locale structure                                       | `I18nProviderProps` types `dictionaries` as `ComposedDictionaries`, which is only assignable from the factory. |
-| Using `t` for all calls including literal keys                                | Loses compile-time key validation; typos go undetected until runtime                   | Expose `ts` with narrowed key type; enforce the `ts`-for-literals convention via ESLint.                       |
-| Mounting the locale switcher outside the provider                             | `setLocale` on the stub is a no-op; locale change has no effect                        | Document that the provider must wrap all locale-aware UI.                                                      |
-| Two augmenting modules extending `I18nDictionary` with the same top-level key | TypeScript intersects leaf types to `never`                                            | Enforce namespace uniqueness in documentation; the type error surfaces immediately.                            |
+The root package entry point MUST expose the following runtime values. No subpath imports are part of the supported public API:
+
+| Export                                                                                     | Consumer-visible purpose                              |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `I18nProvider`, `I18nContext`, `useI18n`                                                   | Provider, context, and context accessor.              |
+| `SUPPORTED_LOCALES`, `DEFAULT_FALLBACK_LOCALE`, `DEFAULT_STORAGE_KEY`, `isSupportedLocale` | Supported locale contract and defaults.               |
+| `defineDictionary`, `defineDictionaries`, `createEmptyComposedDictionaries`                | Dictionary definition and composition.                |
+| `flatten`, `mergeFlat`, `lookup`                                                           | Dictionary utilities exposed by the root entry point. |
+
+The exported types are listed in [08-type-safety](08-type-safety.md) Step 7 and include provider/context, translation, formatting, dictionary, locale, and parameter contracts. The published entry point and declaration file MUST agree on these exports.
+
+## Step 7 — Anti-patterns the library MUST make difficult
+
+| Anti-pattern                                                                  | Why wrong                                                                                   | How the library helps                                                                                                   |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Calling `defineDictionaries` inside a component function                      | Creates a new `ComposedDictionaries` reference on every render, defeating memo caching      | Document the module-scope requirement; the provider's memo is invalidated on reference change.                          |
+| Augmenting `I18nDictionary` with overlapping top-level keys                   | Produces `never` leaf types, causing `I18nKey` to become `never`                            | Document namespace ownership; TypeScript surfaces the resulting type errors.                                            |
+| Passing a raw plain object as `dictionaries` instead of the factory output    | No type guarantee of frozen per-locale structure                                            | The documented API requires `defineDictionaries`; TypeScript structural typing alone cannot enforce factory provenance. |
+| Using `t` for all calls including literal keys                                | Loses compile-time key validation; typos go undetected until runtime                        | Expose `ts` with narrowed key type; enforce the `ts`-for-literals convention via ESLint.                                |
+| Mounting the locale switcher outside the provider                             | `setLocale` on the stub is a no-op; locale change has no effect                             | Document that the provider must wrap all locale-aware UI.                                                               |
+| Two augmenting modules extending `I18nDictionary` with the same top-level key | TypeScript intersects the declarations; incompatible literal leaf types can become `never`. | Require disjoint namespace ownership in consumer guidance; incompatible intersections produce type errors.              |

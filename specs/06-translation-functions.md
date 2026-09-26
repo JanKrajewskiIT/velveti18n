@@ -6,16 +6,16 @@ The i18n context exposes three translation functions. Their type signatures are:
 
 ```typescript
 // General-purpose translation. Accepts any string key.
-type TranslateFn = (key: VelvetI18nKey | (string & {}), params?: MessageParams) => string;
+type TranslateFn = (key: I18nKey | (string & {}), params?: MessageParams) => string;
 
-// Strict literal-key translation. Key must be a statically known member of VelvetI18nKey.
-type TranslateStaticFn = (key: VelvetI18nKey, params?: MessageParams) => string;
+// Strict literal-key translation. Key must be a statically known member of I18nKey.
+type TranslateStaticFn = (key: I18nKey, params?: MessageParams) => string;
 
 // Rich-text translation. Returns JSX.Element.
-type TranslateRichFn = (key: VelvetI18nKey, params?: RichMessageParams) => JSX.Element;
+type TranslateRichFn = (key: I18nKey, params?: RichMessageParams) => JSX.Element;
 ```
 
-`VelvetI18nKey` is the conditional key type described in [08-type-safety](08-type-safety.md). The `(string & {})` intersection on `TranslateFn` widens the type to accept dynamic string values while still showing known keys as completions in editors. `TranslateStaticFn` accepts only statically known keys; a computed string value assigned to the key parameter MUST produce a TypeScript type error unless explicitly cast.
+`I18nKey` is the conditional key type described in [08-type-safety](08-type-safety.md). The `(string & {})` intersection on `TranslateFn` widens the type to accept dynamic string values while still showing known keys as completions in editors. `TranslateStaticFn` accepts only statically known keys; a computed string value assigned to the key parameter MUST produce a TypeScript type error unless explicitly cast.
 
 ## Step 2 — Key resolution algorithm
 
@@ -24,8 +24,8 @@ All three translation functions use the same key resolution algorithm at runtime
 1. Look up the key in the active locale's `FlatDictionary`.
 2. If found, compile the template (see [04-message-format](04-message-format.md) Step 9) and apply the supplied params and active locale. Return the result.
 3. If not found in the active locale, look up the key in the fallback locale's `FlatDictionary`.
-4. If found in the fallback locale, compile and apply. Emit a development-only warning once per key identifying that the active locale is missing the key.
-5. If not found in either dictionary, emit a development-only warning once per key. Return the key string itself as the translation output (passthrough).
+4. If found in the fallback locale, compile and apply. A development-only warning MAY identify that the active locale is missing the key.
+5. If not found in either dictionary, a development-only warning MAY identify the missing key. Return the key string itself as the translation output (passthrough).
 
 Step 5 (passthrough on missing key) MUST NOT throw. Components MUST continue to render even when translation keys are missing.
 
@@ -33,7 +33,7 @@ Step 5 (passthrough on missing key) MUST NOT throw. Components MUST continue to 
 
 `t(key, params?)` is the general-purpose translation function intended for dynamic keys (keys computed at runtime, loaded from data, or derived from external sources).
 
-The `key` parameter accepts both the statically known `VelvetI18nKey` union and any `string`. Type safety for dynamically computed keys is the caller's responsibility.
+The `key` parameter accepts both the statically known `I18nKey` union and any `string`. Type safety for dynamically computed keys is the caller's responsibility.
 
 `t` returns a `string`. It MUST NOT return a `JSX.Element`. Rich-text tag syntax in a template passed through `t` MUST render as literal markup strings in the output.
 
@@ -41,7 +41,7 @@ The `key` parameter accepts both the statically known `VelvetI18nKey` union and 
 
 `ts(key, params?)` is the strict counterpart intended for known, statically typed translation keys.
 
-The `key` parameter accepts only `VelvetI18nKey`. Passing a variable of type `string` to `ts` MUST be a TypeScript compile error unless the value has been narrowed to `VelvetI18nKey`.
+The `key` parameter accepts only `I18nKey`. Passing a variable of type `string` to `ts` MUST be a TypeScript compile error unless the value has been narrowed to `I18nKey`.
 
 At runtime, `ts` is identical to `t`. The distinction is purely at the type level to enforce that call sites using `ts` cannot accidentally pass an unvalidated string.
 
@@ -51,11 +51,11 @@ At runtime, `ts` is identical to `t`. The distinction is purely at the type leve
 
 `tx(key, params?)` translates a template that contains XML-style tag pairs into a `JSX.Element`.
 
-- The `key` parameter accepts only `VelvetI18nKey` (same as `ts`).
+- The `key` parameter accepts only `I18nKey` (same as `ts`).
 - The `params` parameter is a `RichMessageParams` record containing both plain substitution values and `TagHandler` functions keyed by tag name.
 - The return value is a `JSX.Element` suitable for direct use as JSX children.
 
-`tx` applies the RichNode rendering described in [05-rich-text](05-rich-text.md) Step 4 after resolving the template via the key resolution algorithm in Step 2.
+`tx` applies the tag-rendering behavior described in [05-rich-text](05-rich-text.md) Step 4 after resolving the template via the key resolution algorithm in Step 2.
 
 When a key resolved via the fallback locale contains rich-text tags, the fallback rendering MUST also use the `tx` rendering path (not the plain-string path).
 

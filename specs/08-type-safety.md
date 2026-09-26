@@ -13,14 +13,14 @@ Consumers extend this interface via module augmentation to register their dictio
 
 ```typescript
 // In a consumer application's type declaration file:
-declare module "@scope/i18n" {
-  interface I18nDictionary extends typeof myDictionary {}
+declare module '@scope/i18n' {
+  interface I18nDictionary extends Pick<typeof myDictionary, keyof typeof myDictionary> {}
 }
 ```
 
 When no augmentation is present, `I18nDictionary` is an empty interface equivalent to `Record<never, never>`.
 
-## Step 2 — VelvetI18nKey conditional type
+## Step 2 — I18nKey conditional type
 
 The library MUST export a conditional key type (suggested name: `I18nKey`):
 
@@ -100,18 +100,25 @@ Without `defineDictionary` or `as const`, TypeScript widens string values to `st
 
 The library MUST export the following types from its public entry point:
 
-| Export                 | Kind         | Description                                                               |
-| ---------------------- | ------------ | ------------------------------------------------------------------------- |
-| `Locale`               | Type alias   | Union of supported locale strings.                                        |
-| `I18nDictionary`       | Interface    | Augmentable global key-set interface.                                     |
-| `I18nKey`              | Type alias   | Conditional key type (`string` or `DotPath<I18nDictionary>`).             |
-| `DotPath<T>`           | Type utility | Derives dotted leaf paths from a literal-typed object type.               |
-| `TranslationOf<T>`     | Type utility | Maps a literal-typed dictionary type to its translation mirror.           |
-| `DictionaryNode`       | Type alias   | Nested dictionary input shape.                                            |
-| `FlatDictionary`       | Type alias   | Flat dotted-path dictionary.                                              |
-| `ComposedDictionaries` | Type alias   | Frozen per-locale flat dictionary record, output of `defineDictionaries`. |
-| `MessageParams`        | Type alias   | Plain substitution parameter map.                                         |
-| `RichMessageParams`    | Type alias   | Substitution parameter map extended with `TagHandler` values.             |
-| `TagHandler`           | Type alias   | JSX-returning tag wrapping function.                                      |
-| `I18nContextValue`     | Interface    | Shape of the value returned by `useI18n`.                                 |
-| `I18nProviderProps`    | Interface    | Shape of the provider's props.                                            |
+| Export                    | Kind         | Description                                                        |
+| ------------------------- | ------------ | ------------------------------------------------------------------ |
+| `Locale`                  | Type alias   | Union of supported locale strings.                                 |
+| `LocaleDictionariesInput` | Type alias   | Per-locale arrays of dictionary layers.                            |
+| `I18nDictionary`          | Interface    | Augmentable global key-set interface.                              |
+| `I18nKey`                 | Type alias   | Conditional key type (`string` or `DotPath<I18nDictionary>`).      |
+| `DotPath<T>`              | Type utility | Derives dotted leaf paths from a literal-typed object type.        |
+| `TranslationOf<T>`        | Type utility | Maps a literal-typed dictionary type to its translation mirror.    |
+| `DictionaryNode`          | Type alias   | Nested dictionary input shape.                                     |
+| `FlatDictionary`          | Type alias   | Flat dotted-path dictionary.                                       |
+| `ComposedDictionaries`    | Type alias   | Per-locale flat dictionary record, output of `defineDictionaries`. |
+| `MessageParams`           | Type alias   | Plain substitution parameter map.                                  |
+| `RichMessageParams`       | Type alias   | Substitution parameter map extended with `TagHandler` values.      |
+| `TagHandler`              | Type alias   | JSX-returning tag wrapping function.                               |
+| `TranslateFn`             | Type alias   | General-purpose translation function signature.                    |
+| `TranslateStaticFn`       | Type alias   | Strict-key translation function signature.                         |
+| `TranslateRichFn`         | Type alias   | Rich-text translation function signature.                          |
+| `FormatNumberFn`          | Type alias   | Locale-aware number formatter signature.                           |
+| `FormatDateFn`            | Type alias   | Locale-aware date/time formatter signature.                        |
+| `FormatRelativeTimeFn`    | Type alias   | Locale-aware relative-time formatter signature.                    |
+| `I18nContextValue`        | Interface    | Shape of the value returned by `useI18n`.                          |
+| `I18nProviderProps`       | Interface    | Shape of the provider's props.                                     |

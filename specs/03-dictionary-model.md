@@ -49,7 +49,7 @@ The library MUST provide a `flatten` utility (may be internal) that converts a `
 3. If the value is a plain object, recurse with the updated prefix.
 4. Return the accumulated flat map.
 
-Keys that are already in dotted-path form at the top level of a `DictionaryNode` MUST pass through unchanged; the algorithm MUST NOT double-flatten them.
+Top-level string keys that already contain dots MUST pass through unchanged. Dots in keys below the top level are not supported; consumers MUST use nested objects for those paths. The algorithm MUST NOT double-flatten a top-level dotted key.
 
 The flattening operation MUST be pure and deterministic: the same `DictionaryNode` input MUST always produce the same `FlatDictionary` output.
 
@@ -111,7 +111,9 @@ Readonly<Record<Locale, FlatDictionary>>
 
 The output object and each per-locale dictionary MUST be frozen (`Object.freeze`). Consumers MUST NOT mutate `ComposedDictionaries` after construction; mutation attempts in strict mode MUST throw a `TypeError`.
 
-The output is referentially stable: passing the same layers in the same order MUST produce a value suitable for memoization by the provider.
+The output contents are deterministic for the same input layers and order. The factory is not required to return the same object identity across separate calls; consumers that need a stable reference MUST call it once and retain the result.
+
+The runtime factory result contains every supported locale, including locales whose layer list is empty. `ComposedDictionaries` is a public TypeScript contract: its declared shape MUST agree with whether partial locale records are accepted by the provider. TypeScript cannot prove that a structurally compatible value was created by a particular factory.
 
 ## Step 7 — Lookup
 
@@ -121,10 +123,10 @@ The library MUST provide an internal lookup function that resolves a dotted-path
 lookup(dict: FlatDictionary, key: string): string | undefined
 ```
 
-The function MUST return `undefined` when the key is absent. The caller is responsible for applying the fallback strategy described in [06-translation-functions](06-translation-functions.md).
+The function MUST return `undefined` when the key is absent, including when the key names a property inherited from `Object.prototype`. Only own dictionary entries are valid translations. The caller is responsible for applying the fallback strategy described in [06-translation-functions](06-translation-functions.md).
 
 ## Step 8 — Invariants
 
-- A `ComposedDictionaries` value MUST be constructed exclusively by `defineDictionaries`. The provider MUST NOT accept ad-hoc plain objects in place of the factory output.
+- `defineDictionaries` MUST return a complete record with an entry for every supported locale. The provider MUST accept the documented `ComposedDictionaries` contract; do not claim that TypeScript enforces factory provenance.
 - `FlatDictionary` values MUST be frozen before they leave the factory. No translation function MAY modify them.
 - The empty dictionary state (no `composedDictionaries` prop on the provider) MUST be represented by frozen empty objects for each locale, not by `null` or `undefined`.

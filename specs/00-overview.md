@@ -26,7 +26,7 @@ Deliver a single npm package that provides type-safe internationalization for So
 - **Strict namespace ownership.** Each dictionary author owns a disjoint top-level namespace. TypeScript module augmentation extends the global key set additively without deep-merge collisions.
 - **Type-safe keys everywhere.** Once the global interface is augmented, every key passed to the static-translate function is validated at compile time. Typos, renamed keys, and missing translations surface as type errors.
 - **Graceful degradation.** The translation hook outside the provider tree returns a non-crashing stub. The provider in SSR renders without throwing. Malformed templates fall back to passthrough rather than erroring.
-- **Compiled once, applied many times.** Message templates are parsed and compiled to functions on first use and cached by template string. Repeated calls with different parameters pay only substitution cost.
+- **Consistent repeated translation.** Repeated calls with the same template, locale, and parameters produce the same translation result. Implementations may cache parsing or formatting work.
 - **ESM-only, zero extra runtime dependencies.** Only SolidJS is required at runtime.
 
 ## Architecture
@@ -50,7 +50,7 @@ Deliver a single npm package that provides type-safe internationalization for So
 │  I18nProvider (runtime)                                     │
 │     ├─ locale signal (reactive)                             │
 │     ├─ dictionary lookup (active + fallback locale)         │
-│     └─ Intl formatter pool                                  │
+│     └─ locale-sensitive Intl formatting                     │
 └────────────────────────┬────────────────────────────────────┘
                          │
           ┌──────────────┼──────────────┐
@@ -64,25 +64,31 @@ Library collaborators:
 
 - **Dictionary factory** — accepts per-locale arrays of `DictionaryNode` layers, flattens each layer, merges layers left-to-right, and returns a frozen `ComposedDictionaries` record consumed by the provider.
 - **Provider** — SolidJS component holding a reactive locale signal, the composed dictionaries, and all translation/formatting functions. Establishes the i18n context for its subtree.
-- **Message compiler** — parses ICU MessageFormat templates once, caches compiled functions by template string, and applies parameter substitution at render time.
-- **Intl formatter pool** — caches `Intl.NumberFormat`, `Intl.DateTimeFormat`, `Intl.PluralRules`, and `Intl.RelativeTimeFormat` instances by `(locale, options)` tuple to avoid repeated construction.
+- **Message processing** — parses supported message syntax and applies parameter substitution using the active locale.
+- **Locale-sensitive formatting** — uses the platform `Intl` APIs for number, date/time, plural, and relative-time behavior.
 - **Type utilities** — `DotPath<T>`, `TranslationOf<T>`, and `I18nDictionary` augmentation provide compile-time key safety and shape parity across locale variants.
 
 ## Framework-wide requirements
 
-No synchronous or asynchronous operation performed by the library MAY throw in non-browser (SSR) environments. All browser-specific access (localStorage, navigator, document) MUST be guarded.
+Import, provider setup, locale detection, persistence, and document-language synchronization MUST tolerate non-browser environments without throwing because browser globals are absent or inaccessible. This guarantee does not suppress errors caused by invalid caller-supplied Intl options or invalid date values; those cases are defined by the relevant formatting specs.
 
 The library MUST NOT navigate the user, perform network requests, or write to any storage other than the single configurable localStorage key.
 
 The library MUST expose exactly one reactive locale signal. Components MUST NOT need to manage locale state themselves.
 
-Message template compilation MUST be idempotent and referentially stable: the same template string MUST always produce the same compiled function reference after the first parse.
+Message rendering MUST be deterministic for the same template, locale, and parameters. Internal parse-result and formatter caching are optional optimizations.
 
 The library MUST ship as ESM, side-effect-free, with TypeScript types included in the published artifact.
 
 The public surface MUST remain stable within a major version. Breaking changes MUST be accompanied by spec changes.
 
-The library MUST NOT log to the developer console in production. Development-only warnings MUST be suppressed when the build environment is not a development mode.
+The library MUST NOT log to the developer console in production. Development-only warnings MUST be suppressed when the build environment is not a development mode. Warning deduplication frequency is diagnostic behavior, not a consumer compatibility contract.
+
+## Evidence and handoff
+
+Implementation evidence and the clean-room boundary are recorded in [the spec index](README.md). The numbered specs define required observable behavior and published compatibility contracts. Internal module names, AST shapes, exact cache keys, and algorithms are not requirements unless explicitly stated as externally observable or necessary for package compatibility.
+
+Before approving these specs as the sole brief for a replacement, resolve the open dispositions in the spec index. After approval, the rebuilding implementer MUST use only the approved specs and MUST NOT inspect the superseded implementation or its generated artifacts.
 
 ## How to read these specs
 

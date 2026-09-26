@@ -6,7 +6,7 @@ The library MUST be published as a single ESM-only package:
 
 - Module format: ESM only. The package MUST NOT ship a CommonJS entry point or a dual-format build.
 - `"type": "module"` in `package.json`.
-- Exactly one public entry exporting the full surface from [09-consumer-integration](09-consumer-integration.md) Step 1.
+- Exactly one public entry exporting the full surface from [09-consumer-integration](09-consumer-integration.md) Step 6 and [08-type-safety](08-type-safety.md) Step 7.
 - Bundled `.d.ts` accompanying the entry, resolvable under both `"types"` and the `"types"` condition in `"exports"`.
 - `sideEffects: false`.
 - Published files limited to the build output directory only. Source, tests, configs, and development files MUST be excluded via the `files` allowlist.
@@ -68,7 +68,7 @@ Optional peer-dependency floors the library's `devDependencies` MUST satisfy:
 
 | File                     | Required wiring                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `eslint.config.mjs`      | Default-exports the result of `createEslintConfig` from `@jankrajewskiit/configs/eslint`. Passes `tsconfigRootDir`. Enables the browser environment. MUST NOT compose additional ESLint plugins or override rules outside the factory's documented options surface.                                                                                                                                                                                                                                                                        |
+| `eslint.config.mjs`      | Default-exports the result of `createEslintConfig` from `@jankrajewskiit/configs/eslint`. Passes `tsconfigRootDir` and enables the browser environment. A narrow local override MAY permit the empty augmentable `I18nDictionary` interface; no other local rule overrides or plugin composition are required.                                                                                                                                                                                                                             |
 | `vite.config.ts`         | Invokes `defineConfig` with an async factory returning the result of `createSolidLibViteConfig` from `@jankrajewskiit/configs/vite`. Enables `externalizeFromPackageJson` and `preserveModules: false` to produce a single bundled entry. MUST NOT register `vite-plugin-solid` or `vite-plugin-dts` directly.                                                                                                                                                                                                                             |
 | `tsconfig.json`          | Extends `@jankrajewskiit/configs/tsconfig/lib`. MUST NOT extend any other preset from the `tsconfig` subpath. MUST declare `"rootDir": "src"` in `compilerOptions` so that declaration files are emitted to `dist/` rather than `dist/src/`.                                                                                                                                                                                                                                                                                               |
 | `lint-staged.config.mjs` | Default-exports the result of the factory from `@jankrajewskiit/configs/lint-staged`. MUST NOT use the 1.x-style `.lintstagedrc` JSON shape. Because the library ships no CSS, the Stylelint entry MUST be dropped from the returned config object: call `createLintStagedConfig()` without arguments, then `delete config['*.css']` before exporting. MUST NOT pass an empty string as `stylelintTarget` — the factory uses `??` and an empty string bypasses the default, producing an invalid glob that crashes lint-staged at runtime. |
@@ -110,16 +110,16 @@ CI MUST run on every push to the default branch and every pull request targeting
 
 The library MUST ship:
 
-| File                           | Role                                                                                                                                                                                                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/verify.yml` | Reusable verification workflow declared `workflow_call`-reusable. Installs dependencies via `npm ci` with `GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}` so the `${GHCR_TOKEN}` substitution in `.npmrc` resolves correctly. Runs the audit gate at `--audit-level=high`. Runs `npm run verify`. |
-| `.github/workflows/ci.yml`     | Entrypoint for verification triggered on push to the default branch and on PRs targeting it. Delegates to `verify.yml`. MUST NOT hold a registry credential.                                                                                                                                |
+| File                           | Role                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/verify.yml` | Reusable verification workflow declared `workflow_call`-reusable. Installs dependencies via `npm ci` with `GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}` so the `${GHCR_TOKEN}` substitution in `.npmrc` resolves correctly. Runs the audit gate at `--audit-level=high`. Runs `npm run verify`. |
+| `.github/workflows/ci.yml`     | Entrypoint for verification triggered on push to the default branch and on PRs targeting it. Delegates to `verify.yml`. MUST NOT hold a registry credential.                                                                                                                              |
 
 The verify workflow MUST pin the Node version to the value in `.nvmrc`. It MUST cache the dependency store keyed on the lockfile hash. It MUST NOT push commits, create tags, comment on PRs, or write to the registry.
 
 Every workflow MUST pin `actions/checkout` at `v6` and `actions/setup-node` at `v6`. Earlier major versions MUST NOT be used.
 
-Every caller that invokes `verify.yml` via `workflow_call` MUST pass `secrets: inherit` so that `GITHUB_TOKEN` is available inside the reusable workflow for authenticated `npm ci`. Without it, the `${GHCR_TOKEN}` substitution in `.npmrc` resolves to an empty string and the install fails with a 401.
+Every caller that invokes `verify.yml` via `workflow_call` MUST pass `secrets: inherit` so that the `GHCR_TOKEN` secret is available inside the reusable workflow for authenticated `npm ci`. Without it, the `${GHCR_TOKEN}` substitution in `.npmrc` resolves to an empty string and the install fails with a 401.
 
 ## Step 9 — Release pipeline
 
@@ -155,11 +155,11 @@ The `README.md` MUST document the consumer-side verification command: `npm audit
 
 ## Step 12 — Audit gating and code ownership
 
-The verify workflow MUST run a high-severity audit step (`npm audit --audit-level=high`). The step MUST NOT be marked `continue-on-error`. A high-severity advisory that the maintainer determines is not exploitable MAY be suppressed only via an explicit, source-controlled suppression record citing the advisory ID and justification. Every suppression MUST carry a target removal date; an expired suppression MUST fail the verify workflow.
+The verify workflow MUST run a high-severity audit step (`npm audit --audit-level=high`) as part of the required verification job. The step MUST NOT be marked `continue-on-error`. A high-severity advisory that the maintainer determines is not exploitable MAY be suppressed only via an explicit, source-controlled suppression record citing the advisory ID and justification. Every suppression MUST carry a target removal date; an expired suppression MUST fail the verify workflow.
 
 The repository MUST ship `.github/CODEOWNERS` declaring ownership of at minimum: the repository root, the specs directory, the source directory, `.github/workflows/`, `package.json`, the lockfile, `.npmrc`, and the preset-wiring entry files from Step 4.
 
-Default-branch protection MUST require: a passing verify status check, a passing audit status check, at least one approving CODEOWNERS review, and an up-to-date branch. Force pushes and non-administrative direct pushes to the default branch MUST be disabled.
+Default-branch protection MUST require: a passing verify status check that includes the audit step, at least one approving CODEOWNERS review, and an up-to-date branch. Force pushes and non-administrative direct pushes to the default branch MUST be disabled.
 
 ## Step 13 — Dependency automation
 
