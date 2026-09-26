@@ -1,11 +1,12 @@
 import type { Accessor, JSX } from 'solid-js';
+
 import { lookup } from './dictionary';
 import { warnOnce } from './internal/env';
 import { coerceDate, getDateTimeFormat, getNumberFormat, getRelativeTimeFormat } from './intl';
 import { DEFAULT_FALLBACK_LOCALE, type Locale } from './locales';
 import type { RichNode } from './message/ast';
 import { compileMessage, compileRichMessage } from './message/compile';
-import type { MessageParams, RichMessageParams, TagHandler } from './params';
+import type { MessageParams, RichMessageParams } from './params';
 import type { FlatDictionary, I18nKey } from './types';
 
 export type TranslateFn = (key: I18nKey | (string & {}), params?: MessageParams) => string;
@@ -48,7 +49,7 @@ const renderRichNodes = (nodes: readonly RichNode[], params?: RichMessageParams)
     if (typeof node === 'string') return node;
     const children = renderRichNodes(node.children, params);
     const handler = params?.[node.tag];
-    if (typeof handler === 'function') return (handler as TagHandler)(children);
+    if (typeof handler === 'function') return handler(children);
     return children;
   });
 

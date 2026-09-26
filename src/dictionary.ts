@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES, type Locale } from './locales';
+import { type Locale, SUPPORTED_LOCALES } from './locales';
 import type { ComposedDictionaries, DictionaryNode, FlatDictionary } from './types';
 
 export const flatten = (node: DictionaryNode, prefix = ''): Record<string, string> => {

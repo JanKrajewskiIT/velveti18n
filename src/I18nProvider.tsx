@@ -1,8 +1,9 @@
-import { type ParentProps, createEffect, createMemo, createSignal, on } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, type ParentProps } from 'solid-js';
+
+import { DEFAULT_STORAGE_KEY, detectLocale, persistLocale, setDocumentLang } from './detection';
 import { createEmptyComposedDictionaries } from './dictionary';
-import { detectLocale, persistLocale, setDocumentLang, DEFAULT_STORAGE_KEY } from './detection';
-import { I18nContext } from './I18nContext';
 import { createI18nFunctions } from './i18n-functions';
+import { I18nContext } from './I18nContext';
 import { warnOnce } from './internal/env';
 import { DEFAULT_FALLBACK_LOCALE, isSupportedLocale, type Locale } from './locales';
 import type { ComposedDictionaries, FlatDictionary } from './types';
@@ -18,7 +19,7 @@ const EMPTY_COMPOSED = createEmptyComposedDictionaries();
 const EMPTY_DICTIONARY: FlatDictionary = Object.freeze({});
 
 const I18nProvider = (props: ParentProps<I18nProviderProps>) => {
-  const storageKey = (): string => props.storageKey ?? DEFAULT_STORAGE_KEY;
+  const storageKey = createMemo(() => props.storageKey ?? DEFAULT_STORAGE_KEY);
 
   const fallbackLocale = createMemo<Locale>(() => {
     const value = props.fallbackLocale;
@@ -33,7 +34,7 @@ const I18nProvider = (props: ParentProps<I18nProviderProps>) => {
     return value;
   });
 
-  const initialLocale = props.initialLocale ?? detectLocale(storageKey());
+  const initialLocale = props.initialLocale ?? detectLocale(props.storageKey ?? DEFAULT_STORAGE_KEY);
   const [locale, setLocaleSignal] = createSignal<Locale>(initialLocale);
 
   const setLocale = (next: Locale): void => {

@@ -4,7 +4,7 @@ export class ParseError extends Error {}
 
 const SPECIAL_CHARS = new Set(['{', '}', '<', '>', '#']);
 const WHITESPACE = new Set([' ', '\t', '\n', '\r']);
-const TAG_NAME = /^[A-Za-z_][\w-]*/;
+const TAG_NAME = /^[A-Za-z_][\w-]*/u;
 
 class MessageParser {
   private pos = 0;
@@ -75,7 +75,7 @@ class MessageParser {
         continue;
       }
 
-      text += char;
+      text += char ?? '';
       this.pos++;
     }
 
@@ -105,7 +105,7 @@ class MessageParser {
           closed = true;
           break;
         }
-        out += char;
+        out += char ?? '';
         this.pos++;
       }
       if (!closed) throw new ParseError('Unterminated quote escape');
@@ -158,8 +158,8 @@ class MessageParser {
     this.pos++;
     this.skipWhitespace();
     let style = '';
-    while (this.pos < this.source.length && this.source[this.pos] !== '}') {
-      style += this.source[this.pos];
+    while (this.pos < this.source.length && this.source.charAt(this.pos) !== '}') {
+      style += this.source.charAt(this.pos);
       this.pos++;
     }
     if (this.source[this.pos] !== '}') throw new ParseError('Unterminated argument');

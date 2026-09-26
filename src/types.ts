@@ -4,7 +4,7 @@ export type DictionaryNode = { readonly [key: string]: string | DictionaryNode }
 
 export type FlatDictionary = Readonly<Record<string, string>>;
 
-export type ComposedDictionaries = Readonly<Record<Locale, FlatDictionary>>;
+export type ComposedDictionaries = Readonly<Partial<Record<Locale, FlatDictionary>>>;
 
 export type DotPath<T> = T extends string
   ? never

@@ -32,7 +32,7 @@ export const persistLocale = (storageKey: string, locale: Locale): void => {
 
 export const setDocumentLang = (locale: Locale): void => {
   try {
-    if (typeof document !== 'undefined' && document.documentElement) {
+    if (typeof document !== 'undefined') {
       document.documentElement.lang = locale;
     }
   } catch {
