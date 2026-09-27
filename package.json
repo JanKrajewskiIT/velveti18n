@@ -1,5 +1,5 @@
 {
-  "name": "@jankrajewskiit/velvet-i18n",
+  "name": "@jankrajewskiit/i18n",
   "version": "2.0.8",
   "description": "Type-safe, reactive internationalization for SolidJS.",
   "type": "module",
