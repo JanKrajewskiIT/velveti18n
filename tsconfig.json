@@ -2,8 +2,8 @@
   "extends": "@jankrajewskiit/configs/tsconfig/lib",
   "compilerOptions": {
     "rootDir": "src",
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "types": [],
+    "declarationMap": false
   },
   "include": ["src"]
 }

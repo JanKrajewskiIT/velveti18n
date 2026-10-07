@@ -1,302 +1,368 @@
-import type { MessageNode, ParsedMessage } from './ast.js';
+import type {
+  ArgumentNode,
+  DateTimeNode,
+  DateTimeStyle,
+  MessageNode,
+  MessageNodes,
+  NumberNode,
+  NumberStyle,
+  PluralNode,
+  PoundNode,
+  SelectNode,
+} from './ast';
+import { MessageNodeBuilder } from './nodeBuilder';
 
-class MessageSyntaxError extends Error {}
+export class MessageSyntaxError extends Error {
+  readonly position: number;
 
-interface SequenceResult {
-  readonly nodes: MessageNode[];
-  readonly closingTag?: {
-    readonly name: string;
-    readonly end: number;
-    readonly literal: string;
-  };
-  readonly stoppedAtBrace: boolean;
+  constructor(message: string, position: number) {
+    super(message);
+    this.name = 'MessageSyntaxError';
+    this.position = position;
+  }
 }
 
-const tagNamePattern = /^[A-Za-z_][\w-]*$/u;
-const pluralSelectors = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
-const dateStyles = new Set(['short', 'medium', 'long', 'full']);
-const specialEscapes = new Set(['{', '}', '<', '>', '#']);
+interface ParseOptions {
+  readonly richText: boolean;
+}
 
-class MessageParser {
-  private position = 0;
-  private readonly source: string;
-  private readonly rich: boolean;
+interface SequenceContext {
+  readonly inPlural: boolean;
+  readonly insideBranch: boolean;
+}
 
-  constructor(source: string, rich: boolean) {
-    this.source = source;
-    this.rich = rich;
+type PluralSelector =
+  | { readonly kind: 'exact'; readonly value: string }
+  | { readonly kind: 'category'; readonly category: Intl.LDMLPluralRule };
+
+interface Branch<Selector> {
+  readonly selector: Selector;
+  readonly body: MessageNodes;
+}
+
+interface TagToken {
+  readonly type: 'open' | 'close' | 'selfClosing';
+  readonly name: string;
+  readonly source: string;
+}
+
+const NUMBER_STYLES: readonly NumberStyle[] = ['percent', 'currency', 'integer'];
+const DATE_TIME_STYLES: readonly DateTimeStyle[] = ['short', 'medium', 'long', 'full'];
+const PLURAL_CATEGORIES: readonly Intl.LDMLPluralRule[] = ['zero', 'one', 'two', 'few', 'many', 'other'];
+
+const NAME_PATTERN = /[^\s{},'<>#=]+/uy;
+const TYPE_PATTERN = /[A-Za-z]+/uy;
+const WHITESPACE_PATTERN = /\s*/uy;
+const STYLE_PATTERN = /[^{}]*/uy;
+const EXACT_SELECTOR_PATTERN = /=-?\d+(?:\.\d+)?/uy;
+const TAG_PATTERN = /<(\/)?([A-Za-z_][\w-]*)\s*(\/)?>/uy;
+
+const POUND_NODE: PoundNode = { kind: 'pound' };
+const PLAIN_TEXT_STOPPERS = new Set(['{', '}', "'", '<', '#']);
+
+const isQuotableCharacter = (character: string, inPlural: boolean): boolean =>
+  character === '{' || character === '}' || character === '<' || character === '>' || (inPlural && character === '#');
+
+class TemplateParser {
+  readonly #source: string;
+  readonly #richText: boolean;
+  #position = 0;
+
+  constructor(source: string, { richText }: ParseOptions) {
+    this.#source = source;
+    this.#richText = richText;
   }
 
-  parse(): ParsedMessage {
-    const result = this.parseSequence({ pluralDepth: 0 });
-    if (this.position !== this.source.length || result.closingTag) {
-      throw new MessageSyntaxError('Unexpected closing syntax');
-    }
-
-    return { nodes: result.nodes };
+  parse(): MessageNodes {
+    return this.#parseSequence({ inPlural: false, insideBranch: false });
   }
 
-  private parseSequence(options: {
-    readonly stopAtBrace?: boolean;
-    readonly stopAtTagClose?: boolean;
-    readonly pluralDepth: number;
-  }): SequenceResult {
-    const nodes: MessageNode[] = [];
-    let text = '';
+  #parseSequence(context: SequenceContext): MessageNodes {
+    const builder = new MessageNodeBuilder();
 
-    const flushText = (): void => {
-      if (text) {
-        nodes.push({ type: 'text', value: text });
-        text = '';
-      }
-    };
-
-    while (this.position < this.source.length) {
-      const character = this.source[this.position];
-
-      if (character === "'") {
-        const next = this.source[this.position + 1];
-        if (next === "'") {
-          text += "'";
-          this.position += 2;
-          continue;
-        }
-
-        if (next && specialEscapes.has(next)) {
-          const closingQuote = this.source.indexOf("'", this.position + 2);
-          if (closingQuote < 0) {
-            throw new MessageSyntaxError('Unclosed escape span');
-          }
-
-          text += this.source.slice(this.position + 1, closingQuote);
-          this.position = closingQuote + 1;
-          continue;
-        }
-
-        text += character;
-        this.position += 1;
-        continue;
-      }
-
-      if (character === '}' && options.stopAtBrace) {
-        flushText();
-        return { nodes, stoppedAtBrace: true };
-      }
-
+    while (this.#position < this.#source.length) {
+      const character = this.#source.charAt(this.#position);
       if (character === '}') {
-        throw new MessageSyntaxError('Unexpected closing brace');
-      }
-
-      if (this.rich && character === '<') {
-        const closingTag = this.readClosingTag();
-        if (closingTag) {
-          if (options.stopAtTagClose) {
-            flushText();
-            this.position = closingTag.end;
-            return { nodes, closingTag, stoppedAtBrace: false };
-          }
-
-          text += closingTag.literal;
-          this.position = closingTag.end;
-          continue;
+        if (context.insideBranch) {
+          return builder.finish();
         }
+        throw this.#error('Unexpected "}"');
+      }
+      this.#parseSegment(character, context, builder);
+    }
 
-        const openingTag = this.readOpeningTag();
-        if (openingTag) {
-          flushText();
-          const openingPosition = this.position;
-          this.position = openingTag.end;
+    if (context.insideBranch) {
+      throw this.#error('Unterminated branch: expected "}"');
+    }
+    return builder.finish();
+  }
 
-          if (openingTag.selfClosing) {
-            nodes.push({ type: 'tag', name: openingTag.name, children: [] });
-            continue;
-          }
-
-          const children = this.parseSequence({
-            pluralDepth: options.pluralDepth,
-            stopAtTagClose: true,
-          });
-
-          if (children.closingTag?.name === openingTag.name) {
-            nodes.push({
-              type: 'tag',
-              name: openingTag.name,
-              children: children.nodes,
-            });
-            continue;
-          }
-
-          this.position = openingPosition + 1;
-          text += '<';
-          continue;
+  #parseSegment(character: string, context: SequenceContext, builder: MessageNodeBuilder): void {
+    switch (character) {
+      case '{':
+        builder.push(this.#parseArgument(context.inPlural));
+        return;
+      case "'":
+        builder.pushText(this.#parseQuote(context.inPlural));
+        return;
+      case '<':
+        this.#parseAngleBracket(builder);
+        return;
+      case '#':
+        this.#position += 1;
+        if (context.inPlural) {
+          builder.push(POUND_NODE);
+        } else {
+          builder.pushText('#');
         }
-      }
-
-      if (character === '{') {
-        flushText();
-        nodes.push(this.parseArgument(options.pluralDepth));
-        continue;
-      }
-
-      if (character === '#' && options.pluralDepth > 0) {
-        flushText();
-        nodes.push({ type: 'pound' });
-        this.position += 1;
-        continue;
-      }
-
-      text += character ?? '';
-      this.position += 1;
-    }
-
-    flushText();
-    if (options.stopAtBrace) {
-      throw new MessageSyntaxError('Unclosed argument branch');
-    }
-
-    return { nodes, stoppedAtBrace: false };
-  }
-
-  private parseArgument(pluralDepth: number): MessageNode {
-    this.position += 1;
-    const name = this.readUntil([',', '}']).trim();
-    if (!name) {
-      throw new MessageSyntaxError('Argument name is empty');
-    }
-
-    if (this.source[this.position] === '}') {
-      this.position += 1;
-      return { type: 'argument', name, format: 'simple' };
-    }
-
-    this.position += 1;
-    const format = this.readUntil([',', '}']).trim();
-    if (format === 'plural' || format === 'select') {
-      if (this.source[this.position] !== ',') {
-        throw new MessageSyntaxError('Choice argument has no branches');
-      }
-
-      return this.parseChoice(name, format, pluralDepth);
-    }
-
-    if (format !== 'number' && format !== 'date' && format !== 'time') {
-      throw new MessageSyntaxError(`Unsupported argument format: ${format}`);
-    }
-
-    let style: string | undefined;
-    if (this.source[this.position] === ',') {
-      this.position += 1;
-      style = this.readUntil(['}']).trim();
-      if (!style) {
-        throw new MessageSyntaxError('Argument style is empty');
-      }
-    }
-
-    if (this.source[this.position] !== '}') {
-      throw new MessageSyntaxError('Unclosed argument');
-    }
-    this.position += 1;
-
-    if (format === 'number' && style && !['percent', 'currency', 'integer'].includes(style)) {
-      throw new MessageSyntaxError(`Unsupported number style: ${style}`);
-    }
-    if ((format === 'date' || format === 'time') && style && !dateStyles.has(style)) {
-      throw new MessageSyntaxError(`Unsupported date/time style: ${style}`);
-    }
-
-    return { type: 'argument', name, format, style };
-  }
-
-  private parseChoice(name: string, mode: 'plural' | 'select', pluralDepth: number): MessageNode {
-    this.position += 1;
-    const branches = Object.create(null) as Record<string, readonly MessageNode[]>;
-
-    while (this.position < this.source.length) {
-      this.skipWhitespace();
-      if (this.source[this.position] === '}') {
-        this.position += 1;
-        if (!Object.hasOwn(branches, 'other')) {
-          throw new MessageSyntaxError('Choice argument requires an other branch');
-        }
-        return { type: 'choice', name, mode, branches };
-      }
-
-      const selector = this.readUntilWhitespaceOrBrace();
-      if (!selector || this.source[this.position] !== '{') {
-        throw new MessageSyntaxError('Malformed choice branch');
-      }
-      if (mode === 'plural' && !selector.startsWith('=') && !pluralSelectors.has(selector)) {
-        throw new MessageSyntaxError(`Unsupported plural selector: ${selector}`);
-      }
-      if (mode === 'plural' && selector.startsWith('=') && !Number.isFinite(Number(selector.slice(1)))) {
-        throw new MessageSyntaxError(`Malformed exact plural selector: ${selector}`);
-      }
-
-      this.position += 1;
-      const branch = this.parseSequence({
-        pluralDepth: mode === 'plural' ? pluralDepth + 1 : pluralDepth,
-        stopAtBrace: true,
-      });
-      if (!branch.stoppedAtBrace) {
-        throw new MessageSyntaxError('Unclosed choice branch');
-      }
-      this.position += 1;
-      branches[selector] = branch.nodes;
-    }
-
-    throw new MessageSyntaxError('Unclosed choice argument');
-  }
-
-  private readUntil(delimiters: readonly string[]): string {
-    const start = this.position;
-    while (this.position < this.source.length && !delimiters.includes(this.source[this.position] ?? '')) {
-      this.position += 1;
-    }
-    return this.source.slice(start, this.position);
-  }
-
-  private readUntilWhitespaceOrBrace(): string {
-    const start = this.position;
-    while (this.position < this.source.length && !/[\s{}]/u.test(this.source[this.position] ?? '')) {
-      this.position += 1;
-    }
-    return this.source.slice(start, this.position);
-  }
-
-  private skipWhitespace(): void {
-    while (/\s/u.test(this.source[this.position] ?? '')) {
-      this.position += 1;
+        return;
+      default:
+        builder.pushText(this.#readPlainText());
     }
   }
 
-  private readOpeningTag(): { readonly name: string; readonly end: number; readonly selfClosing: boolean } | undefined {
-    const match = /^<([A-Za-z_][\w-]*)(\s*\/?>)/u.exec(this.source.slice(this.position));
-    const name = match?.[1];
-    if (!match || !name || !tagNamePattern.test(name)) {
+  #readPlainText(): string {
+    const start = this.#position;
+    while (this.#position < this.#source.length && !PLAIN_TEXT_STOPPERS.has(this.#source.charAt(this.#position))) {
+      this.#position += 1;
+    }
+    return this.#source.slice(start, this.#position);
+  }
+
+  #parseQuote(inPlural: boolean): string {
+    const next = this.#source.charAt(this.#position + 1);
+    if (next === "'") {
+      this.#position += 2;
+      return "'";
+    }
+    if (!isQuotableCharacter(next, inPlural)) {
+      this.#position += 1;
+      return "'";
+    }
+
+    this.#position += 1;
+    let quoted = '';
+    while (this.#position < this.#source.length) {
+      const character = this.#source.charAt(this.#position);
+      if (character !== "'") {
+        quoted += character;
+        this.#position += 1;
+      } else if (this.#source.charAt(this.#position + 1) === "'") {
+        quoted += "'";
+        this.#position += 2;
+      } else {
+        this.#position += 1;
+        return quoted;
+      }
+    }
+    throw this.#error('Unterminated quoted text');
+  }
+
+  #parseAngleBracket(builder: MessageNodeBuilder): void {
+    const tag = this.#richText ? this.#readTag() : undefined;
+    if (tag === undefined) {
+      this.#position += 1;
+      builder.pushText('<');
+      return;
+    }
+
+    switch (tag.type) {
+      case 'open':
+        builder.openTag(tag.name, tag.source);
+        return;
+      case 'close':
+        builder.closeTag(tag.name, tag.source);
+        return;
+      case 'selfClosing':
+        builder.selfClosingTag(tag.name);
+    }
+  }
+
+  #readTag(): TagToken | undefined {
+    TAG_PATTERN.lastIndex = this.#position;
+    const match = TAG_PATTERN.exec(this.#source);
+    const source = match?.[0];
+    const name = match?.[2];
+    if (source === undefined || name === undefined) {
       return undefined;
     }
 
-    return {
-      name,
-      end: this.position + match[0].length,
-      selfClosing: (match[2] ?? '').includes('/'),
-    };
-  }
-
-  private readClosingTag(): { readonly name: string; readonly end: number; readonly literal: string } | undefined {
-    const match = /^<\/([A-Za-z_][\w-]*)\s*>/u.exec(this.source.slice(this.position));
-    const name = match?.[1];
-    if (!match || !name || !tagNamePattern.test(name)) {
+    const closing = match?.[1] !== undefined;
+    const selfClosing = match?.[3] !== undefined;
+    if (closing && selfClosing) {
       return undefined;
     }
 
-    return {
-      name,
-      end: this.position + match[0].length,
-      literal: match[0],
-    };
+    this.#position += source.length;
+    if (closing) {
+      return { type: 'close', name, source };
+    }
+    return { type: selfClosing ? 'selfClosing' : 'open', name, source };
+  }
+
+  #parseArgument(inPlural: boolean): MessageNode {
+    this.#position += 1;
+    this.#skipWhitespace();
+    const name = this.#match(NAME_PATTERN);
+    if (name === undefined) {
+      throw this.#error('Expected an argument name');
+    }
+
+    this.#skipWhitespace();
+    if (this.#consume('}')) {
+      return { kind: 'argument', name } satisfies ArgumentNode;
+    }
+    this.#expect(',');
+    this.#skipWhitespace();
+
+    const type = this.#match(TYPE_PATTERN);
+    this.#skipWhitespace();
+    switch (type) {
+      case 'number':
+        return { kind: 'number', name, style: this.#parseStyle(NUMBER_STYLES) } satisfies NumberNode;
+      case 'date':
+      case 'time':
+        return { kind: type, name, style: this.#parseStyle(DATE_TIME_STYLES) } satisfies DateTimeNode;
+      case 'plural':
+        return this.#parsePlural(name);
+      case 'select':
+        return this.#parseSelect(name, inPlural);
+      default:
+        throw this.#error(`Unsupported argument type ${JSON.stringify(type)}`);
+    }
+  }
+
+  #parseStyle<Style extends string>(allowedStyles: readonly Style[]): Style | undefined {
+    if (this.#consume('}')) {
+      return undefined;
+    }
+
+    this.#expect(',');
+    const requested = (this.#match(STYLE_PATTERN) ?? '').trim();
+    this.#expect('}');
+    const style = allowedStyles.find((allowed) => allowed === requested);
+    if (style === undefined) {
+      throw this.#error(`Unsupported style ${JSON.stringify(requested)}`);
+    }
+    return style;
+  }
+
+  #parsePlural(name: string): PluralNode {
+    this.#expect(',');
+    const exactBranches = new Map<string, MessageNodes>();
+    const categoryBranches = new Map<string, MessageNodes>();
+
+    for (const { selector, body } of this.#parseBranches(() => this.#parsePluralSelector(), true)) {
+      if (selector.kind === 'exact') {
+        this.#addBranch(exactBranches, selector.value, body);
+      } else {
+        this.#addBranch(categoryBranches, selector.category, body);
+      }
+    }
+
+    const otherBranch = this.#takeOtherBranch(categoryBranches, 'plural');
+    return { kind: 'plural', name, exactBranches, categoryBranches, otherBranch };
+  }
+
+  #parseSelect(name: string, inPlural: boolean): SelectNode {
+    this.#expect(',');
+    const branches = new Map<string, MessageNodes>();
+
+    for (const { selector, body } of this.#parseBranches(() => this.#parseSelectSelector(), inPlural)) {
+      this.#addBranch(branches, selector, body);
+    }
+
+    const otherBranch = this.#takeOtherBranch(branches, 'select');
+    return { kind: 'select', name, branches, otherBranch };
+  }
+
+  #parseBranches<Selector>(parseSelector: () => Selector, inPlural: boolean): Branch<Selector>[] {
+    const branches: Branch<Selector>[] = [];
+
+    for (;;) {
+      this.#skipWhitespace();
+      if (this.#consume('}')) {
+        return branches;
+      }
+
+      const selector = parseSelector();
+      this.#skipWhitespace();
+      this.#expect('{');
+      const body = this.#parseSequence({ inPlural, insideBranch: true });
+      this.#expect('}');
+      branches.push({ selector, body });
+    }
+  }
+
+  #parsePluralSelector(): PluralSelector {
+    const exact = this.#match(EXACT_SELECTOR_PATTERN);
+    if (exact !== undefined) {
+      return { kind: 'exact', value: exact.slice(1) };
+    }
+
+    const word = this.#match(NAME_PATTERN);
+    const category = PLURAL_CATEGORIES.find((candidate) => candidate === word);
+    if (category === undefined) {
+      throw this.#error(`Unsupported plural selector ${JSON.stringify(word)}`);
+    }
+    return { kind: 'category', category };
+  }
+
+  #parseSelectSelector(): string {
+    const selector = this.#match(NAME_PATTERN);
+    if (selector === undefined) {
+      throw this.#error('Expected a select branch selector');
+    }
+    return selector;
+  }
+
+  #addBranch<Key>(branches: Map<Key, MessageNodes>, key: Key, body: MessageNodes): void {
+    if (branches.has(key)) {
+      throw this.#error(`Duplicate branch ${JSON.stringify(key)}`);
+    }
+    branches.set(key, body);
+  }
+
+  #takeOtherBranch(branches: Map<string, MessageNodes>, argumentType: string): MessageNodes {
+    const otherBranch = branches.get('other');
+    if (otherBranch === undefined) {
+      throw this.#error(`A ${argumentType} argument requires an "other" branch`);
+    }
+    branches.delete('other');
+    return otherBranch;
+  }
+
+  #match(pattern: RegExp): string | undefined {
+    pattern.lastIndex = this.#position;
+    const matched = pattern.exec(this.#source)?.[0];
+    if (matched !== undefined) {
+      this.#position += matched.length;
+    }
+    return matched;
+  }
+
+  #skipWhitespace(): void {
+    this.#match(WHITESPACE_PATTERN);
+  }
+
+  #consume(character: string): boolean {
+    if (this.#source.charAt(this.#position) !== character) {
+      return false;
+    }
+    this.#position += 1;
+    return true;
+  }
+
+  #expect(character: string): void {
+    if (!this.#consume(character)) {
+      throw this.#error(`Expected ${JSON.stringify(character)}`);
+    }
+  }
+
+  #error(message: string): MessageSyntaxError {
+    return new MessageSyntaxError(message, this.#position);
   }
 }
 
-export const parseMessage = (template: string, rich = false): ParsedMessage =>
-  new MessageParser(template, rich).parse();
+export const parseMessage = (source: string, options: ParseOptions): MessageNodes =>
+  new TemplateParser(source, options).parse();

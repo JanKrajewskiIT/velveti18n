@@ -1,53 +1,11 @@
-import type { Accessor, ParentProps } from 'solid-js';
-import type { JSX } from 'solid-js';
+import type { Accessor, JSX } from 'solid-js';
 
-import type { Locale } from './locales.js';
+import type { ComposedDictionaries } from './dictionary/types';
+import type { I18nKey } from './keys';
+import type { Locale } from './locale/locales';
+import type { MessageParams, RichMessageParams } from './message/params';
 
-export type { Locale } from './locales.js';
-
-export type DictionaryNode = {
-  readonly [key: string]: string | DictionaryNode;
-};
-
-export type FlatDictionary = Readonly<Record<string, string>>;
-
-export type LocaleDictionariesInput = Readonly<Record<Locale, readonly DictionaryNode[]>>;
-
-export type ComposedDictionaries = Readonly<Record<Locale, FlatDictionary>>;
-
-export type MessageParams = Readonly<Record<string, string | number | boolean | Date | null | undefined>>;
-
-export type TagHandler = (children: JSX.Element) => JSX.Element;
-
-export type RichMessageParams = Readonly<
-  Record<string, string | number | boolean | Date | null | undefined | TagHandler>
->;
-
-export interface I18nDictionary {}
-
-type JoinPath<Key extends string, Path> = Path extends string ? `${Key}.${Path}` : never;
-
-type DotPathRecursive<T, Seen> = T extends Seen
-  ? never
-  : T extends object
-    ? {
-        [K in keyof T & string]: T[K] extends string
-          ? K
-          : T[K] extends object
-            ? JoinPath<K, DotPathRecursive<T[K], Seen | T>>
-            : never;
-      }[keyof T & string]
-    : never;
-
-export type DotPath<T> = DotPathRecursive<T, never>;
-
-export type TranslationOf<T> = {
-  readonly [K in keyof T]: T[K] extends string ? string : T[K] extends object ? TranslationOf<T[K]> : never;
-};
-
-export type I18nKey = keyof I18nDictionary extends never ? string : DotPath<I18nDictionary>;
-
-export type TranslateFn = (key: I18nKey | (string & {}), params?: MessageParams) => string;
+export type TranslateFn = (key: I18nKey | (string & Record<never, never>), params?: MessageParams) => string;
 
 export type TranslateStaticFn = (key: I18nKey, params?: MessageParams) => string;
 
@@ -74,9 +32,9 @@ export interface I18nContextValue {
   readonly formatRelativeTime: FormatRelativeTimeFn;
 }
 
-export type I18nProviderProps = ParentProps<{
+export interface I18nProviderProps {
   readonly dictionaries?: ComposedDictionaries;
   readonly storageKey?: string;
   readonly initialLocale?: Locale;
   readonly fallbackLocale?: Locale;
-}>;
+}

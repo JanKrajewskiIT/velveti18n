@@ -1,22 +1,16 @@
 # Changelog
 
-## 0.1.0
+## Unreleased
 
 ### Breaking
 
-- Initial public package contract.
-
 ### Added
-
-- SolidJS provider, reactive locale context, translation functions, and `Intl` formatters.
-- Layered dictionary composition and type-safe dictionary utilities.
-- ICU MessageFormat subset parsing and rich-text tag handlers.
-- ESM package build, CI verification, and provenance-enabled release workflow.
 
 ### Changed
 
-- None.
+- Reimplemented the package from the behavioral specs in `specs/`.
+- Dictionary lookup now ignores properties inherited from `Object.prototype`; own entries named `toString` or `constructor` are valid translations.
+- `ComposedDictionaries` is a complete per-locale record.
+- Peer range of `solid-js` is bounded to `>=1.9.0 <2`.
 
 ### Fixed
-
-- None.

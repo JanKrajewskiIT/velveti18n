@@ -5,8 +5,9 @@ export default createEslintConfig({
   environments: ['browser'],
   extraConfigs: [
     {
-      files: ['src/types.ts'],
-      rules: { '@typescript-eslint/no-empty-object-type': 'off' },
+      name: 'i18n/augmentable-dictionary',
+      files: ['src/I18nDictionary.ts'],
+      rules: { '@typescript-eslint/no-empty-object-type': ['error', { allowInterfaces: 'always' }] },
     },
   ],
 });
