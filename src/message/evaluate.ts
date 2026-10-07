@@ -3,8 +3,7 @@ import { toDate } from '../intl/dateValue';
 import { getDateTimeFormat, getNumberFormat, getPluralRules } from '../intl/formatters';
 import type { Locale } from '../locale/locales';
 import type { DateTimeNode, MessageNode, MessageNodes, NumberNode, NumberStyle, PluralNode } from './ast';
-import type { RichMessageParams } from './params';
-import { readParam } from './readParam';
+import type { ParamReader } from './readParam';
 
 export interface RenderedTag {
   readonly tag: string;
@@ -15,7 +14,7 @@ export type RenderedNode = string | RenderedTag;
 
 interface EvaluationContext {
   readonly locale: Locale;
-  readonly params: RichMessageParams;
+  readonly readValue: ParamReader;
   readonly pluralValue: number | undefined;
 }
 
@@ -84,23 +83,23 @@ const evaluateNode = (output: RenderedNode[], node: MessageNode, context: Evalua
       appendText(output, node.value);
       return;
     case 'argument':
-      appendText(output, formatArgument(node.name, readParam(context.params, node.name)));
+      appendText(output, formatArgument(node.name, context.readValue(node.name)));
       return;
     case 'number':
-      appendText(output, formatNumberArgument(node, context.locale, readParam(context.params, node.name)));
+      appendText(output, formatNumberArgument(node, context.locale, context.readValue(node.name)));
       return;
     case 'date':
     case 'time':
-      appendText(output, formatDateTimeArgument(node, context.locale, readParam(context.params, node.name)));
+      appendText(output, formatDateTimeArgument(node, context.locale, context.readValue(node.name)));
       return;
     case 'plural': {
-      const count = Number(readParam(context.params, node.name));
+      const count = Number(context.readValue(node.name));
       const branch = selectPluralBranch(node, count, context.locale);
       evaluateNodes(output, branch, { ...context, pluralValue: count });
       return;
     }
     case 'select': {
-      const selected = coerceToString(readParam(context.params, node.name));
+      const selected = coerceToString(context.readValue(node.name));
       evaluateNodes(output, node.branches.get(selected) ?? node.otherBranch, context);
       return;
     }
@@ -127,8 +126,8 @@ const evaluateNodes = (output: RenderedNode[], nodes: MessageNodes, context: Eva
   }
 };
 
-export const evaluateMessage = (nodes: MessageNodes, locale: Locale, params: RichMessageParams): RenderedNode[] => {
+export const evaluateMessage = (nodes: MessageNodes, locale: Locale, readValue: ParamReader): RenderedNode[] => {
   const output: RenderedNode[] = [];
-  evaluateNodes(output, nodes, { locale, params, pluralValue: undefined });
+  evaluateNodes(output, nodes, { locale, readValue, pluralValue: undefined });
   return output;
 };

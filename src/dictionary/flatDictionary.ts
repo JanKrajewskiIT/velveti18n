@@ -2,8 +2,13 @@ import type { DictionaryNode, FlatDictionary } from './types';
 
 type FlatEntry = readonly [path: string, template: string];
 
-const isDictionaryNode = (value: unknown): value is DictionaryNode =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isDictionaryNode = (value: unknown): value is DictionaryNode => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const prototype: unknown = Reflect.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
 
 const collectEntries = (node: DictionaryNode, parentPath: string | undefined): FlatEntry[] =>
   Object.entries(node).flatMap<FlatEntry>(([key, value]: [string, unknown]) => {
@@ -14,7 +19,7 @@ const collectEntries = (node: DictionaryNode, parentPath: string | undefined): F
     if (isDictionaryNode(value)) {
       return collectEntries(value, path);
     }
-    throw new TypeError(`Dictionary entry ${JSON.stringify(path)} must be a string or an object.`);
+    throw new TypeError(`Dictionary entry ${JSON.stringify(path)} must be a string or a plain object.`);
   });
 
 export const flatten = (node: DictionaryNode): FlatDictionary =>

@@ -1,8 +1,18 @@
 import type { I18nDictionary } from './I18nDictionary';
 
-export type DotPath<T> = {
-  [Key in keyof T & string]: T[Key] extends string ? Key : T[Key] extends object ? `${Key}.${DotPath<T[Key]>}` : never;
-}[keyof T & string];
+type DotPathOf<T, Seen> = T extends Seen
+  ? never
+  : T extends object
+    ? {
+        [Key in keyof T & string]: T[Key] extends string
+          ? Key
+          : T[Key] extends object
+            ? `${Key}.${DotPathOf<T[Key], Seen | T>}`
+            : never;
+      }[keyof T & string]
+    : never;
+
+export type DotPath<T> = DotPathOf<T, never>;
 
 export type TranslationOf<T> = {
   [Key in keyof T]: T[Key] extends string ? string : TranslationOf<T[Key]>;
