@@ -146,7 +146,7 @@ Recover from a broken release by publishing a superseding patch and running `npm
 
 Protect the default branch with:
 
-- a required, passing `verify` status check that includes the `npm audit --audit-level=high` step;
+- a required, passing `verify` status check that includes the `npm audit` step;
 - at least one approving CODEOWNERS review;
 - a branch that is up to date before merging;
 - force pushes and non-administrative direct pushes disabled.
