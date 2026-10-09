@@ -1,9 +1,3 @@
 .agents/
-.claude/
-.codex/
-.cursor/
-.github/instructions/
-.github/skills/
-AGENTS.md
 dist/
 package-lock.json

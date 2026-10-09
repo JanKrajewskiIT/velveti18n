@@ -1,36 +1,16 @@
-name: verify
+name: Verify
 
 on:
   workflow_call:
     secrets:
       GHCR_TOKEN:
-        required: true
+        required: false
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    uses: jankrajewskiit/velvetconfigs/.github/workflows/verify-package.yml@main
     permissions:
       contents: read
       packages: read
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.GHCR_TOKEN }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          registry-url: https://npm.pkg.github.com
-          scope: '@jankrajewskiit'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit
-        run: npm audit --audit-level=high
-
-      - name: Verify
-        run: npm run verify
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

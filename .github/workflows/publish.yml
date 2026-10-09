@@ -12,56 +12,18 @@ concurrency:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
-    secrets: inherit
-
-  check-version:
-    needs: verify
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Check release tag and package version
-        shell: bash
-        run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Release tag must match v<semver>."
-            exit 1
-          fi
-          tag_version="${GITHUB_REF_NAME#v}"
-          pkg_version="$(node -p "require('./package.json').version")"
-          if [ "$tag_version" != "$pkg_version" ]; then
-            echo "::error::package.json version $pkg_version does not match tag $GITHUB_REF_NAME"
-            exit 1
-          fi
+      packages: read
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
   publish:
-    needs: check-version
-    runs-on: ubuntu-latest
+    needs: verify
+    uses: jankrajewskiit/velvetconfigs/.github/workflows/publish-package.yml@main
     permissions:
       contents: read
-      id-token: write
       packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          registry-url: https://npm.pkg.github.com
-          scope: '@jankrajewskiit'
-
-      - name: Install dependencies
-        run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Publish package with provenance
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      id-token: write
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

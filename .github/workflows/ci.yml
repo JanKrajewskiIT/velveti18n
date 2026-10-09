@@ -9,4 +9,8 @@ on:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

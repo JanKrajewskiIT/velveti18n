@@ -1,12 +1,12 @@
 {
   "name": "@jankrajewskiit/i18n",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "Type-safe, reactive internationalization for SolidJS.",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jankrajewskiit/VelvetI18n.git"
+    "url": "git+https://github.com/JanKrajewskiIT/VelvetI18n.git"
   },
   "packageManager": "npm@12.2.0",
   "engines": {
@@ -39,7 +39,8 @@
     "solid-js": ">=1.9.0 <2"
   },
   "scripts": {
-    "verify": "npm run typecheck && npm run lint && npm run build && publint --strict && attw --pack . --profile esm-only --ignore-rules internal-resolution-error",
+    "verify": "npm run typecheck && npm run lint && npm run build && npm run verify:pkg",
+    "verify:pkg": "publint --strict && attw --pack . --entrypoints . --profile esm-only --ignore-rules internal-resolution-error",
     "build": "vite build",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",
     "lint": "eslint .",
@@ -51,17 +52,16 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@jankrajewskiit/configs": "^3.2.0",
+    "@jankrajewskiit/configs": "^3.3.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.12.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "publint": "^0.3.25",
-    "solid-js": "^1.9.16",
-    "stylelint": "^17.16.0",
+    "solid-js": "^1.9.17",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.3.3"
+    "vite": "^8.3.4"
   },
   "overrides": {
     "eslint": "$eslint"
