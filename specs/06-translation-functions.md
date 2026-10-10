@@ -45,7 +45,7 @@ The `key` parameter accepts only `I18nKey`. Passing a variable of type `string` 
 
 At runtime, `ts` is identical to `t`. The distinction is purely at the type level to enforce that call sites using `ts` cannot accidentally pass an unvalidated string.
 
-**Convention:** Consumer code SHOULD use `ts` everywhere a key is written as a string literal, and `t` only when the key is computed dynamically. This convention MAY be enforced by an ESLint `no-restricted-syntax` rule that flags `t("literal")` (a literal string passed directly to `t`) and directs the author to use `ts` instead.
+**Convention:** Consumer code SHOULD use `ts` everywhere a key is written as a string literal, and `t` only when the key is computed dynamically. `@jankrajewskiit/configs/eslint` provides the `buildLiteralI18nKeyRule` builder to enforce this convention for consumer code.
 
 ## Step 5 — Rich-text translate: `tx`
 

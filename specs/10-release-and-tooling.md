@@ -35,11 +35,11 @@ The library's `package.json` MUST declare at minimum:
 | `publishConfig.access`   | `"public"`. Required so the publish step can attach an OIDC-signed provenance attestation; npm refuses provenance for `restricted` or first-time private packages. |
 | `peerDependencies`       | SolidJS at the minimum version from the technical-stack table in the spec index.                                                                                   |
 | `scripts`                | At minimum: `verify`, `build`, `typecheck`, `lint`, `lint:fix`, `format`, `format:check`, `prepublishOnly`, `prepare`.                                             |
-| `devDependencies`        | MUST include `@jankrajewskiit/configs` at `^2.0.2`.                                                                                                                |
+| `devDependencies`        | MUST include `@jankrajewskiit/configs` at `^3.3.4` or later within the supported 3.x line.                                                                         |
 
 ## Step 3 — Shared tooling framework
 
-The library MUST depend on `@jankrajewskiit/configs` at `^2.0.2` (2.x major; never 1.x). The 1.x line MUST NOT be used — it has incompatible peer-dependency floors and divergent factory shapes.
+The library MUST depend on `@jankrajewskiit/configs` at `^3.3.4` (3.x major). Older major lines MUST NOT be used because their peer-dependency floors and factory contracts differ.
 
 The library MUST consume its lint, format, style-lint, TypeScript, Vite, lint-staged, and Husky presets exclusively from the published subpath exports of `@jankrajewskiit/configs`. The library MUST NOT vendor, fork, or re-implement those presets locally.
 

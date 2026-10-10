@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4.0
+
+### Added
+
+- Export `resolveInitialLocale` so applications can use the library's storage, browser-language, and fallback resolution.
+
 ## 3.2.0
 
 ### Breaking

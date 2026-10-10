@@ -7,6 +7,7 @@ export { I18nProvider } from './I18nProvider';
 export type { DotPath, I18nKey, TranslationOf } from './keys';
 export { DEFAULT_FALLBACK_LOCALE, DEFAULT_STORAGE_KEY } from './locale/defaults';
 export { isSupportedLocale, type Locale, SUPPORTED_LOCALES } from './locale/locales';
+export { resolveInitialLocale } from './locale/resolveLocale';
 export type { MessageParams, RichMessageParams, TagHandler } from './message/params';
 export type {
   FormatDateFn,

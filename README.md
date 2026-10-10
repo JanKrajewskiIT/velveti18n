@@ -104,6 +104,7 @@ Rules that keep the integration correct:
 | `I18nContext`                                                                         | value | Solid context holding the `I18nContextValue`.                                         |
 | `useI18n`                                                                             | value | Returns the context value, or a degraded stub outside the provider.                   |
 | `SUPPORTED_LOCALES`, `isSupportedLocale`                                              | value | Supported locale list and its type guard.                                             |
+| `resolveInitialLocale`                                                                | value | Resolves a requested locale, persisted locale, browser language, and fallback.        |
 | `DEFAULT_FALLBACK_LOCALE`, `DEFAULT_STORAGE_KEY`                                      | value | Provider defaults (`"en"`, `"velvet-locale"`).                                        |
 | `defineDictionary`                                                                    | value | Identity helper that preserves literal dictionary types.                              |
 | `defineDictionaries`                                                                  | value | Flattens and merges per-locale layers into frozen dictionaries.                       |

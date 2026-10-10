@@ -88,12 +88,13 @@ Each augmenting module MUST only augment with its own namespace. Augmenting with
 
 The root package entry point MUST expose the following runtime values. No subpath imports are part of the supported public API:
 
-| Export                                                                                     | Consumer-visible purpose                              |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| `I18nProvider`, `I18nContext`, `useI18n`                                                   | Provider, context, and context accessor.              |
-| `SUPPORTED_LOCALES`, `DEFAULT_FALLBACK_LOCALE`, `DEFAULT_STORAGE_KEY`, `isSupportedLocale` | Supported locale contract and defaults.               |
-| `defineDictionary`, `defineDictionaries`, `createEmptyComposedDictionaries`                | Dictionary definition and composition.                |
-| `flatten`, `mergeFlat`, `lookup`                                                           | Dictionary utilities exposed by the root entry point. |
+| Export                                                                                     | Consumer-visible purpose                                                      |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `I18nProvider`, `I18nContext`, `useI18n`                                                   | Provider, context, and context accessor.                                      |
+| `SUPPORTED_LOCALES`, `DEFAULT_FALLBACK_LOCALE`, `DEFAULT_STORAGE_KEY`, `isSupportedLocale` | Supported locale contract and defaults.                                       |
+| `resolveInitialLocale`                                                                     | Resolves a requested locale or detects one from storage and browser language. |
+| `defineDictionary`, `defineDictionaries`, `createEmptyComposedDictionaries`                | Dictionary definition and composition.                                        |
+| `flatten`, `mergeFlat`, `lookup`                                                           | Dictionary utilities exposed by the root entry point.                         |
 
 The exported types are listed in [08-type-safety](08-type-safety.md) Step 7 and include provider/context, translation, formatting, dictionary, locale, and parameter contracts. The published entry point and declaration file MUST agree on these exports.
 
