@@ -1,9 +1,4 @@
 import { createSolidLibViteConfig } from '@jankrajewskiit/configs/vite';
 import { defineConfig } from 'vite';
 
-export default defineConfig(async () =>
-  createSolidLibViteConfig(
-    {},
-    { fileName: 'index', externalizeFromPackageJson: true, preserveModules: false, dts: { rollupTypes: true } },
-  ),
-);
+export default defineConfig(async () => createSolidLibViteConfig({}, { fileName: 'index', preserveModules: false }));

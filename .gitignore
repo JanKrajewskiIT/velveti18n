@@ -1,19 +1,17 @@
 node_modules/
-dist/
 .husky/_/
-
-*.log
-npm-debug.log*
-
+coverage/
+dist/
+build/
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
-.idea/
-*.local
+*.log
 
-.env
-.env.*
+.artifacts/
+.deployment/
 
-# Generated agent customizations
 /AGENTS.md
 /CLAUDE.md
 /.claude
