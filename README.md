@@ -96,6 +96,22 @@ Rules that keep the integration correct:
 - A single quote escapes `{`, `}`, `<`, `>` (and `#` inside plural branches) when it directly precedes one of them; `''` is a literal quote.
 - A tag without a handler renders its children; an unbalanced tag renders as literal text.
 
+## Formatting an already resolved template
+
+Version 3.4.2 exports `formatMessage(template, locale, params)` and `formatRichMessage(template, locale, params)`. These functions use the same parser, plural rules, formatting caches and rich-text handlers as the provider, but accept a template directly without looking it up as a dictionary key. Pass `{}` when a message has no parameters. They do not need a Solid owner or change locale storage or document metadata.
+
+```ts
+import { formatMessage, formatRichMessage } from '@jankrajewskiit/i18n';
+
+const rows = formatMessage('{count, plural, one {# row} other {# rows}}', 'en', { count: 2 });
+const selection = formatRichMessage('<strong>{count}</strong> selected', 'en', {
+  count: 2,
+  strong: (children) => children,
+});
+```
+
+`formatMessage` returns a string; `formatRichMessage` returns a Solid `JSX.Element`. Rich templates are rendered through explicit tag handlers rather than HTML insertion. Libraries can use these functions for fallback templates while keeping the existing provider's active locale and dictionary overrides.
+
 ## Public surface
 
 | Export                                                                                | Kind  | Description                                                                           |

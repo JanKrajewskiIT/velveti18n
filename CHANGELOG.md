@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4.2
+
+### Added
+
+- Export `formatMessage` and `formatRichMessage` for formatting resolved templates with an explicit locale and parameters, using the provider's existing plain/rich rendering implementation.
+
 ## 3.4.0
 
 ### Added

@@ -9,6 +9,7 @@ export { DEFAULT_FALLBACK_LOCALE, DEFAULT_STORAGE_KEY } from './locale/defaults'
 export { isSupportedLocale, type Locale, SUPPORTED_LOCALES } from './locale/locales';
 export { resolveInitialLocale } from './locale/resolveLocale';
 export type { MessageParams, RichMessageParams, TagHandler } from './message/params';
+export { formatMessage, formatRichMessage } from './message/render';
 export type {
   FormatDateFn,
   FormatNumberFn,
