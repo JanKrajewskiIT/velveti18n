@@ -78,16 +78,16 @@ Optional peer-dependency floors the library's `devDependencies` MUST satisfy:
 
 ## Step 5 — Required workspace files
 
-| File             | Required content                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.npmrc`         | Scope-to-registry mapping routing `@jankrajewskiit` to the registry from `publishConfig.registry`. MUST NOT contain credentials.                                                |
-| `.editorconfig`  | UTF-8, `lf` line endings, indent size 2, insert-final-newline, trim-trailing-whitespace.                                                                                        |
-| `.nvmrc`         | A Node version string satisfying `engines.node`.                                                                                                                                |
-| `.node-version`  | The same Node version string as `.nvmrc`. The two files MUST agree at all times.                                                                                                |
-| `.gitattributes` | `text=auto eol=lf` for all text files.                                                                                                                                          |
-| `.gitignore`     | Excludes `node_modules/`, build output, `.husky/_`, editor/OS noise, local env files. MUST NOT exclude the lockfile or the submodule directories.                               |
-| `.gitmodules`    | Declares exactly three submodule entries (`.claude`, `.cursor`, `.agents`) with identical `url` pointing at the organization-level upstream agent-guideline repository.         |
-| `CHANGELOG.md`   | A section for every published version, grouped at minimum into "Breaking", "Added", "Changed", "Fixed". Each version-bump commit MUST contain the corresponding changelog edit. |
+| File             | Required content                                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.npmrc`         | Scope-to-registry mapping routing `@jankrajewskiit` to the registry from `publishConfig.registry`. MUST NOT contain credentials.                                        |
+| `.editorconfig`  | UTF-8, `lf` line endings, indent size 2, insert-final-newline, trim-trailing-whitespace.                                                                                |
+| `.nvmrc`         | A Node version string satisfying `engines.node`.                                                                                                                        |
+| `.node-version`  | The same Node version string as `.nvmrc`. The two files MUST agree at all times.                                                                                        |
+| `.gitattributes` | `text=auto eol=lf` for all text files.                                                                                                                                  |
+| `.gitignore`     | Excludes `node_modules/`, build output, `.husky/_`, editor/OS noise, local env files. MUST NOT exclude the lockfile or the submodule directories.                       |
+| `.gitmodules`    | Declares exactly three submodule entries (`.claude`, `.cursor`, `.agents`) with identical `url` pointing at the organization-level upstream agent-guideline repository. |
+| Shared changelog | A consolidated entry for every published version, grouped at minimum into "Breaking", "Added", "Changed", "Fixed". Each release MUST update the shared changelog.       |
 
 ## Step 6 — Verification gate
 
@@ -189,7 +189,7 @@ The library MUST ship a root-level `README.md` included in the published tarball
 - **Install** — package name, install command, `.npmrc` scope-to-registry entry, peer dependencies with minimum versions.
 - **Integration overview** — a minimal end-to-end example: provider mount, dictionary composition, module augmentation, and basic use of `ts`, `tx`, and `formatDate`.
 - **Surface table** — every public export with a one-line description, kept in sync with [09-consumer-integration](09-consumer-integration.md) Step 1.
-- **Upgrading** — link to `CHANGELOG.md` entries; when a new major has shipped, the previous major's last-supported version.
+- **Upgrading** — link to the consolidated changelog; when a new major has shipped, the previous major's last-supported version.
 - **Provenance verification** — `npm audit signatures <package-name>` as a copy-pasteable one-liner, with a brief explanation of what a passing audit attests.
 - **Release workflow** — the bump → tag → push flow, and the broken-release recovery procedure (`npm deprecate` + superseding patch).
 - **Branch protection** — the checklist from Step 12 so a fresh fork can re-establish protection without guessing the contract.
