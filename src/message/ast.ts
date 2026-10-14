@@ -4,7 +4,7 @@ export type DateTimeStyle = 'short' | 'medium' | 'long' | 'full';
 
 export type MessageNodes = readonly MessageNode[];
 
-export interface TextNode {
+interface TextNode {
   readonly kind: 'text';
   readonly value: string;
 }
@@ -45,7 +45,7 @@ export interface PoundNode {
   readonly kind: 'pound';
 }
 
-export interface TagNode {
+interface TagNode {
   readonly kind: 'tag';
   readonly name: string;
   readonly children: MessageNodes;

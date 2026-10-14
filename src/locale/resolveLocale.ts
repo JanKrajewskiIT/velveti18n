@@ -3,7 +3,7 @@ import { readNavigatorLanguage, readStoredLocaleValue } from './browserAccess';
 import { DEFAULT_FALLBACK_LOCALE } from './defaults';
 import { isSupportedLocale, type Locale } from './locales';
 
-export const detectLocale = (storageKey: string): Locale => {
+const detectLocale = (storageKey: string): Locale => {
   const stored = readStoredLocaleValue(storageKey);
   if (isSupportedLocale(stored)) {
     return stored;
