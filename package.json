@@ -33,7 +33,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "solid-js": ">=1.9.0 <2"
+    "solid-js": "^1"
   },
   "scripts": {
     "verify": "npm run toolchain && npm run editor:check && npm run format:check && npm run typecheck && npm run lint && npm run quality:check && npm run build && npm run verify:pkg",
@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@jankrajewskiit/configs": "^3.25.0",
+    "@jankrajewskiit/configs": "^3.26.0",
     "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.14.0",
